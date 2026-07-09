@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "652266735464",
+    "project_id": "kumbh-tent-19e88",
+    "storage_bucket": "kumbh-tent-19e88.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:652266735464:android:699159f3539c5fdfc678dd",
+        "android_client_info": {
+          "package_name": "com.kumbhtent.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA0nxTHLijTagKSzV4n4nJgA-hYE09SX7E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
