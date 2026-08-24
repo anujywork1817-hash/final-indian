@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -153,18 +154,18 @@ func getProfile(c *gin.Context) {
 	`, phone).Scan(&reviewCount)
 
 	var kycStatus, idType string
-db.QueryRow(`SELECT COALESCE(kyc_status,'not_submitted'), COALESCE(id_type,'') FROM users WHERE phone = $1`, phone).Scan(&kycStatus, &idType)
+	db.QueryRow(`SELECT COALESCE(kyc_status,'not_submitted'), COALESCE(id_type,'') FROM users WHERE phone = $1`, phone).Scan(&kycStatus, &idType)
 
-c.JSON(http.StatusOK, gin.H{
-    "phone":         phone,
-    "name":          name,
-    "email":         email,
-    "role":          role,
-    "booking_count": bookingCount,
-    "review_count":  reviewCount,
-    "kyc_status":    kycStatus,
-    "id_type":       idType,
-})
+	c.JSON(http.StatusOK, gin.H{
+		"phone":         phone,
+		"name":          name,
+		"email":         email,
+		"role":          role,
+		"booking_count": bookingCount,
+		"review_count":  reviewCount,
+		"kyc_status":    kycStatus,
+		"id_type":       idType,
+	})
 }
 
 // PUT /profile
@@ -228,7 +229,8 @@ func updateFCMToken(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "FCM token updated"})
 
 }
-	// POST /auth/kyc
+
+// POST /auth/kyc
 func submitKYC(c *gin.Context) {
 	phone := c.GetHeader("X-User-Phone")
 	if phone == "" {
@@ -257,6 +259,7 @@ func submitKYC(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "KYC submitted successfully", "status": "pending"})
 }
+
 // POST /auth/admin/login
 func adminLogin(c *gin.Context) {
 	var req struct {
@@ -269,8 +272,8 @@ func adminLogin(c *gin.Context) {
 	}
 
 	// Find admin in DB
-	var passwordHash string
-	err := db.QueryRow(`SELECT password_hash FROM admins WHERE username = $1`, req.Username).Scan(&passwordHash)
+	var passwordHash, role string
+	err := db.QueryRow(`SELECT password_hash, role FROM admins WHERE username = $1`, req.Username).Scan(&passwordHash, &role)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid username or password"})
 		return
@@ -291,7 +294,7 @@ func adminLogin(c *gin.Context) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": req.Username,
-		"role":     "admin",
+		"role":     role,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 	})
 
@@ -301,10 +304,12 @@ func adminLogin(c *gin.Context) {
 		return
 	}
 
+	logAdminAction(req.Username, "ADMIN_LOGIN", "admin", req.Username, "")
+
 	c.JSON(http.StatusOK, gin.H{
 		"token":    tokenStr,
 		"username": req.Username,
-		"role":     "admin",
+		"role":     role,
 	})
 }
 
@@ -349,8 +354,11 @@ func adminChangePassword(c *gin.Context) {
 		return
 	}
 
+	logAdminAction(req.Username, "ADMIN_PASSWORD_CHANGED", "admin", req.Username, "")
+
 	c.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
+
 // POST /auth/admin/change-username
 func adminChangeUsername(c *gin.Context) {
 	var req struct {
@@ -393,8 +401,11 @@ func adminChangeUsername(c *gin.Context) {
 		return
 	}
 
+	logAdminAction(req.NewUsername, "ADMIN_USERNAME_CHANGED", "admin", req.CurrentUsername, "new_username="+req.NewUsername)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Username changed successfully", "new_username": req.NewUsername})
 }
+
 // GET /admin/users — all users
 func adminGetUsers(c *gin.Context) {
 	rows, err := db.Query(`
@@ -463,54 +474,62 @@ func adminBlockUser(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
 		return
 	}
+
+	admin, _ := adminRoleFromToken(c)
+	logAdminAction(admin, "USER_"+strings.ToUpper(req.Action), "user", phone, "")
+
 	c.JSON(http.StatusOK, gin.H{"message": "User " + req.Action + "ed successfully", "phone": phone})
 }
 
 func adminGetKYC(c *gin.Context) {
-    rows, err := db.Query(`
+	rows, err := db.Query(`
         SELECT phone, COALESCE(name,''), COALESCE(kyc_status,'not_submitted'), 
         COALESCE(id_type,''), COALESCE(id_number,''), created_at
         FROM users
         WHERE kyc_status IN ('pending','verified','rejected')
         ORDER BY created_at DESC
     `)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch KYC"})
-        return
-    }
-    defer rows.Close()
-    var users []map[string]interface{}
-    for rows.Next() {
-        var phone, name, status, idType, idNumber string
-        var createdAt interface{}
-        rows.Scan(&phone, &name, &status, &idType, &idNumber, &createdAt)
-        users = append(users, map[string]interface{}{
-            "phone": phone, "name": name,
-            "kyc_status": status, "id_type": idType,
-            "id_number": idNumber, "created_at": createdAt,
-        })
-    }
-    if users == nil { users = []map[string]interface{}{} }
-    c.JSON(http.StatusOK, gin.H{"kyc_users": users})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch KYC"})
+		return
+	}
+	defer rows.Close()
+	var users []map[string]interface{}
+	for rows.Next() {
+		var phone, name, status, idType, idNumber string
+		var createdAt interface{}
+		rows.Scan(&phone, &name, &status, &idType, &idNumber, &createdAt)
+		users = append(users, map[string]interface{}{
+			"phone": phone, "name": name,
+			"kyc_status": status, "id_type": idType,
+			"id_number": idNumber, "created_at": createdAt,
+		})
+	}
+	if users == nil {
+		users = []map[string]interface{}{}
+	}
+	c.JSON(http.StatusOK, gin.H{"kyc_users": users})
 }
 
 func adminVerifyKYC(c *gin.Context) {
-    phone := c.Param("phone")
-    var req struct {
-        Status string `json:"status" binding:"required"`
-    }
-    if err := c.ShouldBindJSON(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
-    if req.Status != "verified" && req.Status != "rejected" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "status must be verified or rejected"})
-        return
-    }
-    _, err := db.Exec(`UPDATE users SET kyc_status = $1 WHERE phone = $2`, req.Status, phone)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update KYC"})
-        return
-    }
-    c.JSON(http.StatusOK, gin.H{"message": "KYC status updated", "status": req.Status})
+	phone := c.Param("phone")
+	var req struct {
+		Status string `json:"status" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Status != "verified" && req.Status != "rejected" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status must be verified or rejected"})
+		return
+	}
+	_, err := db.Exec(`UPDATE users SET kyc_status = $1 WHERE phone = $2`, req.Status, phone)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update KYC"})
+		return
+	}
+	admin, _ := adminRoleFromToken(c)
+	logAdminAction(admin, "KYC_"+strings.ToUpper(req.Status), "user", phone, "")
+	c.JSON(http.StatusOK, gin.H{"message": "KYC status updated", "status": req.Status})
 }

@@ -4,6 +4,7 @@ import 'package:kumbh_tent/features/booking/screens/booking_form_screen.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
+import 'package:kumbh_tent/features/booking/widgets/cancellation_policy_badge.dart';
 
 class TentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> tent;
@@ -225,6 +226,9 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                         ],
                       ),
                     ),
+                  const SizedBox(height: 16),
+
+                  CancellationPolicyBadge(tent: tent),
                   const SizedBox(height: 16),
 
                   // ── Amenities ─────────────────────────────────
@@ -584,7 +588,7 @@ class _TentHeroImage extends StatelessWidget {
           transitionDuration: const Duration(milliseconds: 250),
           pageBuilder: (ctx, anim, _) => FadeTransition(
             opacity: anim,
-            child: _TentGalleryScreen(images: images),
+            child: _TentGalleryScreen(images: images, initialIndex: 0),
           ),
         ),
       ),
@@ -657,7 +661,6 @@ class _TentGalleryScreen extends StatefulWidget {
   final List<Map<String, String>> images;
   final int initialIndex;
   const _TentGalleryScreen({
-    super.key,
     required this.images,
     this.initialIndex = 0,
   });
@@ -845,7 +848,7 @@ class _TentGalleryScreenState extends State<_TentGalleryScreen> {
 class _Arrow extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-  const _Arrow({super.key, required this.icon, required this.onTap});
+  const _Arrow({required this.icon, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(

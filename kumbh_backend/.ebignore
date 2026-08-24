@@ -5,3 +5,5 @@
 .git/
 .gitignore
 .env
+
+kumbh_tent/

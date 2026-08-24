@@ -5,31 +5,15 @@ import 'package:kumbh_tent/features/tents/screens/tent_detail_screen.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/features/tents/screens/search_screen.dart';
+import 'package:kumbh_tent/features/kumbh/screens/snan_calendar_screen.dart';
+import 'package:kumbh_tent/core/constants/snan_calendar.dart';
 
-// ── Capsule tent images by class (local assets) ───────────────
-const Map<String, List<String>> kCapsuleImages = {
-  'standard': [
-    'assets/images/regular capsule tent.png',
-    'assets/images/regular all view.png',
-    'assets/images/regular inside view.png',
-    'assets/images/regular inside view2.png',
-    'assets/images/regular inside wiev.png',
-  ],
-  'luxury': [
-    'assets/images/luxury Capsule tent.png',
-    'assets/images/luxury all image.png',
-    'assets/images/luxury inside img.png',
-    'assets/images/luxury inside view.png',
-    'assets/images/luxury inside view2.png',
-  ],
-  'premium': [
-    'assets/images/premium capsule tent.png',
-    'assets/images/premium all view.png',
-    'assets/images/premium inside view.png',
-    'assets/images/premium inside view2.png',
-    'assets/images/premium .png',
-  ],
-};
+// Tent images live in core/constants/constants.dart as
+// kCapsuleImages / imagesForClass. A second copy used to be
+// declared here, shadowing the shared one — two maps with
+// different keys that silently drifted apart. Worse, every file
+// importing both this screen and constants.dart was one
+// reference away from an ambiguous-import error.
 
 // ── Helper to load asset or network image ─────────────────────
 Widget buildTentImage(
@@ -71,6 +55,7 @@ class BrowseScreen extends StatefulWidget {
 
 class _BrowseScreenState extends State<BrowseScreen> {
   String _selectedClass = 'all';
+  String? _loadError;
   List<Map<String, dynamic>> _tents = [];
   bool _isLoading = true;
 
@@ -81,40 +66,61 @@ class _BrowseScreenState extends State<BrowseScreen> {
   }
 
   Future<void> _loadTents() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
       final data = await ApiService.getTents(classFilter: _selectedClass);
+      final mapped = data.map((t) {
+        final tentClass = (t['class'] ?? '') as String;
+        final images = List<String>.from(t['images'] ?? []);
+        // imagesForClass never returns null, so a class with no
+        // artwork can no longer abort the whole list.
+        final displayImages = images.isNotEmpty
+            ? images
+            : imagesForClass(tentClass);
+        return {
+          'id': t['id'],
+          'name': t['name'],
+          'class': tentClass,
+          'location': t['location'],
+          'distance': t['distance'],
+          'rating': t['rating'],
+          'reviews': t['reviews'],
+          'price': t['price'],
+          'base_price': t['base_price'],
+          'is_surge': t['is_surge'],
+          'surge': t['surge'],
+          'amenities': List<String>.from(t['amenities']),
+          'images': displayImages,
+          'color': kColorForClass(tentClass),
+          'availability': t['availability'] ?? 'available',
+          'available': t['available'] ?? 100,
+          'capacity': t['capacity'] ?? 100,
+          'cancellation_policy_type': t['cancellation_policy_type'],
+          'free_cancellation_hours': t['free_cancellation_hours'],
+          'partial_refund_penalty_percent': t['partial_refund_penalty_percent'],
+          'late_cancellation_hours': t['late_cancellation_hours'],
+          'no_show_cutoff_hours': t['no_show_cutoff_hours'],
+          'no_show_penalty_percent': t['no_show_penalty_percent'],
+        };
+      }).toList();
+
       setState(() {
-        _tents = data.map((t) {
-          final tentClass = t['class'] as String;
-          final images = List<String>.from(t['images'] ?? []);
-          final displayImages = images.isNotEmpty
-              ? images
-              : (kCapsuleImages[tentClass] ?? kCapsuleImages['standard']!);
-          return {
-            'id': t['id'],
-            'name': t['name'],
-            'class': tentClass,
-            'location': t['location'],
-            'distance': t['distance'],
-            'rating': t['rating'],
-            'reviews': t['reviews'],
-            'price': t['price'],
-            'base_price': t['base_price'],
-            'is_surge': t['is_surge'],
-            'surge': t['surge'],
-            'amenities': List<String>.from(t['amenities']),
-            'images': displayImages,
-            'color': kColorForClass(tentClass),
-            'availability': t['availability'] ?? 'available',
-            'available': t['available'] ?? 100,
-            'capacity': t['capacity'] ?? 100,
-          };
-        }).toList();
+        _tents = List<Map<String, dynamic>>.from(mapped);
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      // Previously this swallowed the error and left _tents at its
+      // previous value, so a failed load looked exactly like "the
+      // filter did nothing". Clear the list and say what happened.
+      setState(() {
+        _tents = [];
+        _isLoading = false;
+        _loadError = 'Could not load tents. Pull down to retry.';
+      });
+      debugPrint('loadTents failed for class=$_selectedClass: $e');
     }
   }
 
@@ -148,20 +154,36 @@ class _BrowseScreenState extends State<BrowseScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Welcome to Simhastha Kumbh Nashik 2027',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                        Text(
-                          'Capsule Tent Booking',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        // Title and the Snan calendar button share a
+                        // row so the button sits in the top-right
+                        // corner, level with the heading.
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Welcome to Simhastha Kumbh Nashik 2027',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Capsule Tent Booking',
+                                    style: GoogleFonts.poppins(
+                                      color: Colors.white,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _calendarButton(),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         // Search bar
@@ -304,8 +326,42 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   ),
                 )
               : _tents.isEmpty
-              ? const SliverFillRemaining(
-                  child: Center(child: Text('No tents found')),
+              ? SliverFillRemaining(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _loadError != null ? '😕' : '⛺',
+                            style: const TextStyle(fontSize: 44),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _loadError ?? 'No tents in this category',
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.poppins(
+                              fontSize: 14,
+                              color: kDark,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: kTrueSaffron,
+                            ),
+                            onPressed: _loadTents,
+                            child: Text(
+                              'Retry',
+                              style: GoogleFonts.poppins(color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 )
               : SliverPadding(
                   padding: const EdgeInsets.all(16),
@@ -320,6 +376,52 @@ class _BrowseScreenState extends State<BrowseScreen> {
                   ),
                 ),
         ],
+      ),
+    );
+  }
+
+  /// Top-right button into the full 2027 Snan calendar. Carries a
+  /// dot when the next Snan is an Amrit Snan, so the peak days are
+  /// visible without opening the screen.
+  Widget _calendarButton() {
+    final upcoming = kUpcomingSnans;
+    final nextIsAmrit = upcoming.isNotEmpty && upcoming.first.isAmrit;
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SnanCalendarScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(9),
+        decoration: BoxDecoration(
+          color: kLuxGoldSoft.withOpacity(0.22),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(
+              Icons.calendar_month_rounded,
+              color: Colors.white,
+              size: 22,
+            ),
+            if (nextIsAmrit)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: kLuxGold,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: kTrueSaffronDark, width: 1),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

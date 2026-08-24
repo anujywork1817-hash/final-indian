@@ -11,7 +11,9 @@ import 'package:kumbh_tent/features/profile/screens/edit_profile_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/cancellations_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/privacy_policy_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/terms_screen.dart';
-import 'package:kumbh_tent/features/profile/screens/kyc_screen.dart';
+// KYC entry point removed from Settings. kyc_screen.dart is
+// intentionally left in the codebase (unreferenced) so the flow
+// can be restored without rebuilding it.
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -358,24 +360,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 );
                                 if (updated == true) _loadProfile();
                               },
-                            ),
-                            _menuItem(
-                              Icons.verified_outlined,
-                              'KYC Verification',
-                              'Verify your identity',
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      KYCScreen(currentStatus: 'not_submitted'),
-                                ),
-                              ),
-                            ),
-                            _menuItem(
-                              Icons.language_outlined,
-                              'Language',
-                              'Hindi / English',
-                              () {},
                             ),
                           ]),
 

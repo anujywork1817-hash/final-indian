@@ -19,6 +19,12 @@ class PaymentScreen extends StatefulWidget {
   final String? couponCode;
   final String bookingRef;
 
+  /// Taxable amount (base − discount) and GST already computed by
+  /// the server for this booking — carried through so the e-ticket
+  /// can show the CGST/SGST split without re-deriving it.
+  final double taxableAmount;
+  final double tax;
+
   const PaymentScreen({
     super.key,
     required this.tent,
@@ -28,6 +34,8 @@ class PaymentScreen extends StatefulWidget {
     required this.units,
     required this.totalAmount,
     required this.bookingRef,
+    required this.taxableAmount,
+    required this.tax,
     this.couponCode,
   });
 
@@ -236,6 +244,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
             'nights': _nights,
             'guests': widget.guests,
             'total': widget.totalAmount.toStringAsFixed(0),
+            'taxable_amount': widget.taxableAmount,
+            'tax': widget.tax,
             'status': status,
             'payment_id': paymentId,
           },

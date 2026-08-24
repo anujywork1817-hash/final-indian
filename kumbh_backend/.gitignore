@@ -1,6 +1,10 @@
-.env 
-*firebase-service-account.json 
-*.json 
+.env
+*firebase-service-account.json
+*.json
+
+# Local dev output from run-local.ps1
+bin/
+logs/
 
 # Elastic Beanstalk Files
 .elasticbeanstalk/*

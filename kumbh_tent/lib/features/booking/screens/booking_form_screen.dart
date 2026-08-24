@@ -6,6 +6,7 @@ import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/features/payment/screens/payment_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/coupons_screen.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
+import 'package:kumbh_tent/features/booking/widgets/cancellation_policy_badge.dart';
 
 class BookingFormScreen extends StatefulWidget {
   final Map<String, dynamic> tent;
@@ -34,8 +35,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   String _genderPreference = 'Other';
   String _bedType = 'Single';
 
-  bool _pickup = false;
-  bool _pujaKit = false;
+  // Airport/station pickup and puja kit add-ons were removed from
+  // the booking form. Their state, charges, price rows and
+  // booking payload keys went with them so no hidden ₹0 line
+  // items or dead flags remain.
   bool _godavariWalk = false;
   bool _prasadThali = false;
 
@@ -71,15 +74,16 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       ? 0
       : _checkOut!.difference(_checkIn!).inDays;
   double get _baseTotal => widget.tent['price'] * _nights * _units.toDouble();
-  double get _pickupCharge => _pickup ? 500.0 : 0;
-  double get _pujaCharge => _pujaKit ? _units * 200.0 : 0;
   double get _godavariCharge => _godavariWalk ? _guests * 300.0 : 0;
   double get _prasadCharge => _prasadThali ? _guests * 150.0 : 0;
-  double get _addonsTotal =>
-      _pickupCharge + _pujaCharge + _godavariCharge + _prasadCharge;
+  double get _addonsTotal => _godavariCharge + _prasadCharge;
   double get _subtotal => _baseTotal + _addonsTotal;
   double get _discount => _couponApplied ? _subtotal * _couponDiscountRate : 0;
-  double get _tax => (_subtotal - _discount) * kGSTRate;
+  double get _taxableAmount => _subtotal - _discount;
+  double get _gstRate => gstRateFor(_taxableAmount);
+  double get _tax => _taxableAmount * _gstRate;
+  double get _cgst => _tax / 2;
+  double get _sgst => _tax / 2;
   double get _grandTotal => _subtotal - _discount + _tax;
 
   Future<void> _applyCoupon() async {
@@ -142,13 +146,15 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           'id_proof': _idProofController.text.trim(),
           'bed_type': _bedType,
           'gender_preference': _genderPreference,
-          'pickup': _pickup,
-          'puja_kit': _pujaKit,
           'godavari_walk': _godavariWalk,
           'prasad_thali': _prasadThali,
         },
       );
-      final bookingRef = result['booking']['booking_ref'] as String;
+      final serverBooking = result['booking'] as Map<String, dynamic>;
+      final bookingRef = serverBooking['booking_ref'] as String;
+      final serverBase = (serverBooking['base_amount'] as num).toDouble();
+      final serverDiscount = (serverBooking['discount'] as num).toDouble();
+      final serverTax = (serverBooking['tax'] as num).toDouble();
       if (mounted) {
         Navigator.push(
           context,
@@ -160,6 +166,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               guests: _guests,
               units: _units,
               totalAmount: _grandTotal,
+              taxableAmount: serverBase - serverDiscount,
+              tax: serverTax,
               bookingRef: bookingRef,
               couponCode: _couponApplied ? _appliedCouponCode : null,
             ),
@@ -545,20 +553,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               child: Column(
                 children: [
                   _toggle(
-                    '🚗 Airport / Station pickup',
-                    '+ ₹500 one-time',
-                    _pickup,
-                    (v) => setState(() => _pickup = v),
-                  ),
-                  _divider(),
-                  _toggle(
-                    '🛕 Puja kit',
-                    '+ ₹200 per tent',
-                    _pujaKit,
-                    (v) => setState(() => _pujaKit = v),
-                  ),
-                  _divider(),
-                  _toggle(
                     '🚶 Guided Godavari walk',
                     '+ ₹300 per person',
                     _godavariWalk,
@@ -716,6 +710,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
             const SizedBox(height: 20),
 
+            CancellationPolicyBadge(tent: widget.tent),
+            const SizedBox(height: 20),
+
             // ── 8. Price breakdown ──────────────────────────────
             if (_nights > 0) ...[
               _smallLabel('PRICE BREAKDOWN'),
@@ -727,16 +724,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       '₹${widget.tent['price']} × $_nights nights × $_units tent',
                       '₹${_baseTotal.toStringAsFixed(0)}',
                     ),
-                    if (_pickup)
-                      _priceRow(
-                        'Pickup / drop',
-                        '₹${_pickupCharge.toStringAsFixed(0)}',
-                      ),
-                    if (_pujaKit)
-                      _priceRow(
-                        'Puja kit',
-                        '₹${_pujaCharge.toStringAsFixed(0)}',
-                      ),
                     if (_godavariWalk)
                       _priceRow(
                         'Guided Godavari walk',
@@ -753,7 +740,14 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                         '− ₹${_discount.toStringAsFixed(0)}',
                         isDiscount: true,
                       ),
-                    _priceRow('GST (12%)', '₹${_tax.toStringAsFixed(0)}'),
+                    _priceRow(
+                      'CGST (${(_gstRate / 2 * 100).toStringAsFixed(0)}%)',
+                      '₹${_cgst.toStringAsFixed(0)}',
+                    ),
+                    _priceRow(
+                      'SGST (${(_gstRate / 2 * 100).toStringAsFixed(0)}%)',
+                      '₹${_sgst.toStringAsFixed(0)}',
+                    ),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Divider(color: kLuxBorder, thickness: 1),

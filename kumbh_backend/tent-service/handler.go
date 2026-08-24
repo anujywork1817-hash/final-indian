@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -8,23 +9,35 @@ import (
 )
 
 type Tent struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"`
-	Class       string   `json:"class"`
-	Location    string   `json:"location"`
-	Distance    float64  `json:"distance"`
-	Rating      float64  `json:"rating"`
-	Reviews     int      `json:"reviews"`
-	Price       int      `json:"price"`
-	BasePrice   int      `json:"base_price"`
-	IsSurge     bool     `json:"is_surge"`
-	Surge       string   `json:"surge"`
-	Amenities   []string `json:"amenities"`
-	Images      []string `json:"images"`
-	Capacity    int      `json:"capacity"`
-	Booked      int      `json:"booked"`
-	Available   int      `json:"available"`
-	Availability string  `json:"availability"` // "available", "limited", "almost_full", "sold_out"
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Class        string   `json:"class"`
+	Location     string   `json:"location"`
+	Distance     float64  `json:"distance"`
+	Rating       float64  `json:"rating"`
+	Reviews      int      `json:"reviews"`
+	Price        int      `json:"price"`
+	BasePrice    int      `json:"base_price"`
+	IsSurge      bool     `json:"is_surge"`
+	Surge        string   `json:"surge"`
+	Amenities    []string `json:"amenities"`
+	Images       []string `json:"images"`
+	Capacity     int      `json:"capacity"`
+	Booked       int      `json:"booked"`
+	Available    int      `json:"available"`
+	Availability string   `json:"availability"` // "available", "limited", "almost_full", "sold_out"
+
+	// ── Cancellation policy ──────────────────────────────
+	// See kumbh_backend/migrations/002_cancellation_policy.sql.
+	// The actual refund math never happens client-side — this is
+	// display-only, for the policy badge on the tent/booking
+	// screens.
+	CancellationPolicyType      string  `json:"cancellation_policy_type"`
+	FreeCancellationHours       int     `json:"free_cancellation_hours"`
+	PartialRefundPenaltyPercent float64 `json:"partial_refund_penalty_percent"`
+	LateCancellationHours       int     `json:"late_cancellation_hours"`
+	NoShowCutoffHours           int     `json:"no_show_cutoff_hours"`
+	NoShowPenaltyPercent        float64 `json:"no_show_penalty_percent"`
 }
 
 func getAvailabilityLabel(available, capacity int) string {
@@ -48,7 +61,10 @@ func listTents(c *gin.Context) {
 		SELECT t.id, t.name, t.class, t.location, t.distance, t.rating, t.reviews,
 		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images, t.capacity,
 		       COUNT(b.id) as booked,
-		       t.capacity - COUNT(b.id) as available
+		       t.capacity - COUNT(b.id) as available,
+		       t.cancellation_policy_type, t.free_cancellation_hours,
+		       t.partial_refund_penalty_percent, t.late_cancellation_hours,
+		       t.no_show_cutoff_hours, t.no_show_penalty_percent
 		FROM tents t
 		LEFT JOIN bookings b ON b.tent_id = t.id
 		  AND b.status IN ('confirmed', 'pending')
@@ -81,6 +97,9 @@ func listTents(c *gin.Context) {
 			&t.Capacity,
 			&t.Booked,
 			&t.Available,
+			&t.CancellationPolicyType, &t.FreeCancellationHours,
+			&t.PartialRefundPenaltyPercent, &t.LateCancellationHours,
+			&t.NoShowCutoffHours, &t.NoShowPenaltyPercent,
 		)
 		if err != nil {
 			continue
@@ -107,7 +126,10 @@ func getTent(c *gin.Context) {
 		SELECT t.id, t.name, t.class, t.location, t.distance, t.rating, t.reviews,
 		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images, t.capacity,
 		       COUNT(b.id) as booked,
-		       t.capacity - COUNT(b.id) as available
+		       t.capacity - COUNT(b.id) as available,
+		       t.cancellation_policy_type, t.free_cancellation_hours,
+		       t.partial_refund_penalty_percent, t.late_cancellation_hours,
+		       t.no_show_cutoff_hours, t.no_show_penalty_percent
 		FROM tents t
 		LEFT JOIN bookings b ON b.tent_id = t.id
 		  AND b.status IN ('confirmed', 'pending')
@@ -122,6 +144,9 @@ func getTent(c *gin.Context) {
 		&t.Capacity,
 		&t.Booked,
 		&t.Available,
+		&t.CancellationPolicyType, &t.FreeCancellationHours,
+		&t.PartialRefundPenaltyPercent, &t.LateCancellationHours,
+		&t.NoShowCutoffHours, &t.NoShowPenaltyPercent,
 	)
 
 	if err != nil {
@@ -132,7 +157,6 @@ func getTent(c *gin.Context) {
 	t.Availability = getAvailabilityLabel(t.Available, t.Capacity)
 	c.JSON(http.StatusOK, t)
 }
-
 
 // GET /admin/tents — all tents including inactive
 func adminGetTents(c *gin.Context) {
@@ -210,6 +234,7 @@ func adminUpdateTent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update tent: " + err.Error()})
 		return
 	}
+	logAdminAction(adminUsernameFromToken(c), "TENT_UPDATED", "tent", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Tent updated successfully"})
 }
 
@@ -227,9 +252,15 @@ func adminCreateTent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Class == "" { req.Class = "standard" }
-	if req.TotalUnits == 0 { req.TotalUnits = 33 }
-	if req.Capacity == 0 { req.Capacity = 2 }
+	if req.Class == "" {
+		req.Class = "standard"
+	}
+	if req.TotalUnits == 0 {
+		req.TotalUnits = 33
+	}
+	if req.Capacity == 0 {
+		req.Capacity = 2
+	}
 
 	var id int
 	err := db.QueryRow(`
@@ -241,6 +272,7 @@ func adminCreateTent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tent: " + err.Error()})
 		return
 	}
+	logAdminAction(adminUsernameFromToken(c), "TENT_CREATED", "tent", fmt.Sprint(id), "")
 	c.JSON(http.StatusCreated, gin.H{"message": "Tent created successfully", "id": id})
 }
 
@@ -252,5 +284,6 @@ func adminDeleteTent(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tent"})
 		return
 	}
+	logAdminAction(adminUsernameFromToken(c), "TENT_DELETED", "tent", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Tent deleted successfully"})
 }

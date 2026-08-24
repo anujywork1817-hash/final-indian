@@ -26,7 +26,43 @@ const Color kCream = kLuxCream;
 const Color kDark = kLuxDark;
 
 // ── API ──────────────────────────────────────────────────
-const String kBaseUrl = 'http://myapp-backend-env-1.eba-njsam29m.ap-south-1.elasticbeanstalk.com/api/v1';
+
+// Must stay in sync with ApiService.baseUrl in
+// lib/core/network/api_service.dart — some screens call the API
+// through Dio via ApiService, others use the raw http package
+// with this constant, so both have to point at the same backend.
+//
+// SERVER — kumbh_backend deployed at ~/kumbh_tent_backend on
+// 192.168.1.222 (Docker Compose, gateway on 18090). Reachable
+// from any device on the same LAN; the phone does NOT need the
+// adb USB tunnel for this address, only for the localhost one
+// below.
+//
+// THE PORT IS REQUIRED. Without it the URL means port 80, where
+// nothing is listening (it 404s), so every call fails and the
+// screens fall back to whatever they last held — which looks
+// like "the filter does nothing" rather than "the app is
+// offline".
+//
+// This is a private LAN IP, so it only works for devices on the
+// same network — for access from outside, that server needs a
+// domain + reverse proxy (see the deployment notes) and this
+// should be swapped to that URL instead.
+const String kBaseUrl = 'http://192.168.1.222:18090/api/v1';
+
+// Local Docker Compose on this PC — plain http, not https: the
+// local gateway serves no TLS. localhost works because the phone
+// reaches the PC through an adb USB tunnel, which `flutter run`
+// clears on every attach; keep it alive with
+// kumbh_tent/keep-tunnel.ps1.
+//const String kBaseUrl = 'http://localhost:18090/api/v1';
+//   physical device over Wi-Fi -> http://192.168.1.40:18090/api/v1
+//   Android emulator           -> http://10.0.2.2:18090/api/v1
+
+// Production / staging — swap in as needed.
+//const String kBaseUrl = 'https://d3dmb495g7jwhi.cloudfront.net/api/v1';
+//const String kBaseUrl = 'http://myapp-backend-env-1.eba-njsam29m.ap-south-1.elasticbeanstalk.com/api/v1';
+
 // ── Storage Keys ─────────────────────────────────────────
 const String kAuthToken = 'auth_token';
 const String kUserPhone = 'user_phone';
@@ -37,7 +73,17 @@ const String kValidCoupon = 'KUMBH10';
 const double kCouponDiscount = 0.10;
 
 // ── Tax ──────────────────────────────────────────────────
-const double kGSTRate = 0.12;
+//
+// GST on tent accommodation follows the hotel-tariff slabs: 12%
+// (6% CGST + 6% SGST) for a taxable amount up to ₹7,500, 18% (9% +
+// 9%) above that. Must stay in sync with the same threshold in
+// kumbh_backend/booking-service/handler.go.
+const double kGSTThreshold = 7500;
+const double kGSTRateLow = 0.12;
+const double kGSTRateHigh = 0.18;
+
+double gstRateFor(double taxableAmount) =>
+    taxableAmount > kGSTThreshold ? kGSTRateHigh : kGSTRateLow;
 
 // ── App Info ─────────────────────────────────────────────
 const String kAppName = 'Kumbh Tent Booking';
@@ -67,9 +113,16 @@ const List<Map<String, String>> kKumbhDates = [
 ];
 
 // ── Tent Classes ─────────────────────────────────────────
+//
+// `key` is sent to the API as ?class=, so it must be a value the
+// backend actually stores in tents.class — basic, standard,
+// premium, luxury or vip. `label` is the display text and may
+// differ. This list used the key 'regular', which is a label and
+// matches no tent, so selecting it could only ever return an
+// empty list. Pinned by test/tent_class_images_test.dart.
 const List<Map<String, String>> kTentClasses = [
   {'key': 'all', 'label': 'All'},
-  {'key': 'regular', 'label': 'Regular'},
+  {'key': 'standard', 'label': 'Regular'},
   {'key': 'luxury', 'label': 'Luxury'},
   {'key': 'premium', 'label': 'Premium'},
 ];
@@ -129,14 +182,27 @@ String kStatusLabel(String status) {
 }
 
 // ── Local asset images by tent class ─────────────────────
+//
+// Keys MUST cover every class the backend can return —
+// basic, standard, premium, luxury, vip. They previously did
+// not: the map was keyed on 'regular', which is a UI label, not
+// a value the API ever sends. Any tent whose class had no entry
+// fell through to a fallback that was itself missing, and the
+// resulting null-assertion crash aborted the whole tent list.
+const List<String> _regularImages = [
+  'assets/images/regular capsule tent.png',
+  'assets/images/regular all view.png',
+  'assets/images/regular inside view.png',
+  'assets/images/regular inside view2.png',
+  'assets/images/regular inside wiev.png',
+];
+
 const Map<String, List<String>> kCapsuleImages = {
-  'regular': [
-    'assets/images/regular capsule tent.png',
-    'assets/images/regular all view.png',
-    'assets/images/regular inside view.png',
-    'assets/images/regular inside view2.png',
-    'assets/images/regular inside wiev.png',
-  ],
+  // 'basic' and 'standard' share the regular artwork; there is
+  // no separate asset set for them.
+  'basic': _regularImages,
+  'standard': _regularImages,
+  'regular': _regularImages,
   'luxury': [
     'assets/images/luxury Capsule tent.png',
     'assets/images/luxury all image.png',
@@ -144,11 +210,23 @@ const Map<String, List<String>> kCapsuleImages = {
     'assets/images/luxury inside view.png',
     'assets/images/luxury inside view2.png',
   ],
-  'premium': [
-    'assets/images/premium capsule tent.png',
-    'assets/images/premium all view.png',
-    'assets/images/premium inside view.png',
-    'assets/images/premium inside view2.png',
-    'assets/images/premium .png',
-  ],
+  'premium': _premiumImages,
+  // VIP has no dedicated artwork; premium is the closest match.
+  'vip': _premiumImages,
 };
+
+const List<String> _premiumImages = [
+  'assets/images/premium capsule tent.png',
+  'assets/images/premium all view.png',
+  'assets/images/premium inside view.png',
+  'assets/images/premium inside view2.png',
+  'assets/images/premium .png',
+];
+
+/// Images for a tent class, never null and never throwing.
+///
+/// Callers previously wrote `kCapsuleImages[cls] ?? kCapsuleImages['standard']!`
+/// — but 'standard' was not a key, so the fallback itself was
+/// null and the `!` threw. Use this instead.
+List<String> imagesForClass(String? tentClass) =>
+    kCapsuleImages[tentClass] ?? _regularImages;

@@ -32,6 +32,14 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+<<<<<<< HEAD
+=======
+# Silence the hard error emitted by newer MSVC toolsets (VS 2026 preview / MSVC
+# 14.5x) for plugins that still include <experimental/coroutine> (e.g. gal).
+# Applies to all targets added after this point, including generated plugins.
+add_compile_definitions(_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
+>>>>>>> 6fe422602b4717726eebb7e55c2137799775d44b
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

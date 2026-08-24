@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/features/booking/screens/e_ticket_screen.dart';
+import 'package:kumbh_tent/features/booking/widgets/refund_status_panel.dart';
 
 class CancellationsScreen extends StatefulWidget {
   const CancellationsScreen({super.key});
@@ -67,10 +68,19 @@ class _CancellationsScreenState extends State<CancellationsScreen> {
       'nights': b['nights'] ?? 0,
       'guests': b['guests'] ?? 1,
       'total': b['total_amount'] ?? b['total'] ?? 0,
+      'taxable_amount':
+          ((b['base_amount'] ?? 0) as num).toDouble() -
+          ((b['discount'] ?? 0) as num).toDouble(),
+      'tax': ((b['tax'] ?? 0) as num).toDouble(),
       'status': b['status'] ?? 'pending',
       'payment_id': b['payment_id'],
       'color': colors[idx],
       'images': images,
+      // Real refund state from the backend. Absent when no
+      // refund was recorded for this booking.
+      'refund_status': b['refund_status'],
+      'refund_amount': b['refund_amount'],
+      'refund_message': b['refund_message'],
     };
   }
 
@@ -304,7 +314,9 @@ class _CancellationsScreenState extends State<CancellationsScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Refunds are processed within 5-7 business days to your original payment method.',
+                            'Refund requests are reviewed by our team. Once approved, '
+                            'the amount is credited to your original payment method '
+                            'within 3-4 working days.',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
                               color: Colors.orange.shade800,
@@ -431,48 +443,9 @@ class _CancelledCard extends StatelessWidget {
                 Divider(color: kLuxBorder, height: 1),
                 const SizedBox(height: 12),
 
-                // Refund status
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.orange.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Refund Status',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          color: kLuxMuted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.hourglass_top,
-                            color: Colors.orange,
-                            size: 16,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Processing (5-7 business days)',
-                            style: GoogleFonts.poppins(
-                              fontSize: 12,
-                              color: Colors.orange.shade800,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                // Refund status — driven by the backend's real
+                // refund record, not a hardcoded label.
+                RefundStatusPanel(booking: booking),
                 const SizedBox(height: 12),
 
                 // Ref + Amount

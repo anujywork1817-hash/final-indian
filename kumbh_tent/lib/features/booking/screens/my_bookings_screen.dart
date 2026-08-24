@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
+import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/features/booking/screens/e_ticket_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/review_screen.dart';
 
@@ -20,6 +21,14 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   List<dynamic> _bookings = [];
   bool _loading = true;
   String? _error;
+
+  // Guards against double-cancellation from spamming the Cancel
+  // button (or the confirm dialog) before the previous request
+  // for the same booking has returned. The server is already the
+  // real guard (a row lock plus a status check reject a second
+  // cancel outright), but this avoids firing duplicate requests
+  // and duplicate confirmation dialogs from the client at all.
+  final Set<String> _cancelling = {};
 
   @override
   void initState() {
@@ -62,6 +71,26 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   }
 
   Future<void> _cancel(String ref) async {
+    if (_cancelling.contains(ref)) return; // already in flight — ignore the extra tap
+    _cancelling.add(ref);
+    try {
+      await _doCancel(ref);
+    } finally {
+      _cancelling.remove(ref);
+    }
+  }
+
+  Future<void> _doCancel(String ref) async {
+    // Ask the backend what this cancellation actually returns,
+    // so the dialog states a real number instead of leaving the
+    // user to guess. Null means the quote couldn't be fetched —
+    // we then fall back to a message that promises nothing.
+    final quote = await ApiService.getRefundQuote(ref);
+    if (!mounted) return;
+
+    final refundAmount = (quote?['refund_amount'] as num?)?.toDouble();
+    final quoteMessage = quote?['message'] as String?;
+
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -74,9 +103,59 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             fontWeight: FontWeight.w700,
           ),
         ),
-        content: Text(
-          'Are you sure you want to cancel this booking?',
-          style: GoogleFonts.poppins(color: kLuxMuted, fontSize: 14),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to cancel this booking?',
+              style: GoogleFonts.poppins(color: kLuxMuted, fontSize: 14),
+            ),
+            if (quoteMessage != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: (refundAmount != null && refundAmount > 0)
+                      ? Colors.green.shade50
+                      : Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: (refundAmount != null && refundAmount > 0)
+                        ? Colors.green.shade200
+                        : Colors.orange.shade200,
+                  ),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      (refundAmount != null && refundAmount > 0)
+                          ? Icons.account_balance_wallet_outlined
+                          : Icons.info_outline,
+                      size: 16,
+                      color: (refundAmount != null && refundAmount > 0)
+                          ? Colors.green.shade800
+                          : Colors.orange.shade800,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        quoteMessage,
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: (refundAmount != null && refundAmount > 0)
+                              ? Colors.green.shade900
+                              : Colors.orange.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
@@ -111,12 +190,47 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       const storage = FlutterSecureStorage();
       final token = await storage.read(key: 'auth_token') ?? '';
       final phone = await storage.read(key: 'user_phone') ?? '';
-      await http.put(
+      final res = await http.put(
         Uri.parse('$kBaseUrl/bookings/$ref/cancel'),
         headers: {'Authorization': 'Bearer $token', 'X-User-Phone': phone},
       );
+      if (!mounted) return;
+
+      // Previously the response was discarded entirely and every
+      // failure was swallowed, so a rejected cancellation looked
+      // identical to a successful one.
+      final body = res.body.isNotEmpty
+          ? jsonDecode(res.body) as Map<String, dynamic>
+          : <String, dynamic>{};
+
+      if (res.statusCode == 200) {
+        _snack(
+          (body['message'] as String?) ?? 'Booking cancelled',
+          Colors.green,
+        );
+      } else {
+        _snack(
+          (body['error'] as String?) ?? 'Could not cancel booking',
+          Colors.red,
+        );
+      }
       _load();
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) _snack('Could not cancel booking', Colors.red);
+    }
+  }
+
+  void _snack(String msg, Color color) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.poppins(color: Colors.white)),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _clear(String ref) async {
@@ -357,6 +471,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
                       'guests': b['guests'] ?? 1,
                       'total': (b['total_amount'] ?? b['total_price'] ?? 0)
                           .toString(),
+                      'taxable_amount':
+                          ((b['base_amount'] ?? 0) as num).toDouble() -
+                          ((b['discount'] ?? 0) as num).toDouble(),
+                      'tax': ((b['tax'] ?? 0) as num).toDouble(),
                       'status': b['status'] ?? 'pending',
                       'payment_id': b['payment_id'] ?? '',
                     },
@@ -434,6 +552,8 @@ class _BookingCard extends StatelessWidget {
         return const Color(0xFF8B1A1A);
       case 'pending':
         return const Color(0xFF7A4500);
+      case 'no_show':
+        return Colors.white;
       default:
         return kLuxMuted;
     }
@@ -447,6 +567,8 @@ class _BookingCard extends StatelessWidget {
         return const Color(0xFFF5E0E0);
       case 'pending':
         return const Color(0xFFFFF0D9);
+      case 'no_show':
+        return const Color(0xFF2B2B2B);
       default:
         return kLuxGoldSoft;
     }
@@ -461,6 +583,7 @@ class _BookingCard extends StatelessWidget {
     final ref = booking['booking_ref'] ?? booking['id'] ?? '—';
     final total = booking['total_price'] ?? booking['total_amount'] ?? 0;
     final cancelled = _status == 'cancelled';
+    final noShow = _status == 'no_show';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -618,6 +741,46 @@ class _BookingCard extends StatelessWidget {
             ),
           ),
 
+          // No-show explanation — the guest never checked in and
+          // the booking has moved past user control; there is no
+          // cancel/clear action, just the fact and (if applicable)
+          // the refund state, which the API already returns for
+          // no-show bookings via the same refunds join.
+          if (noShow)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F2F2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFDADADA)),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.event_busy,
+                      size: 16,
+                      color: Color(0xFF2B2B2B),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        (booking['refund_message'] as String?) ??
+                            'This booking was marked as a no-show — check-in was not recorded before the cutoff.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: const Color(0xFF2B2B2B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Buttons
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
@@ -647,38 +810,40 @@ class _BookingCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: cancelled ? onClear : onCancel,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cancelled
-                              ? Colors.red
-                              : const Color(0xFF8B1A1A),
-                          side: BorderSide(
-                            color: cancelled
-                                ? Colors.red.shade300
-                                : const Color(0xFFD4AAAA),
-                            width: 1.2,
+                    if (!noShow) ...[
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: cancelled ? onClear : onCancel,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: cancelled
+                                ? Colors.red
+                                : const Color(0xFF8B1A1A),
+                            side: BorderSide(
+                              color: cancelled
+                                  ? Colors.red.shade300
+                                  : const Color(0xFFD4AAAA),
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            backgroundColor: kLuxCream,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: kLuxCream,
-                        ),
-                        child: Text(
-                          cancelled ? 'Clear' : 'Cancel',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
+                          child: Text(
+                            cancelled ? 'Clear' : 'Cancel',
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
-                if (!cancelled) ...[
+                if (!cancelled && !noShow) ...[
                   const SizedBox(height: 8),
                   SizedBox(
                     width: double.infinity,

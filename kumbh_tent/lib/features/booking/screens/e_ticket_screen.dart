@@ -350,6 +350,14 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 ),
                               ],
                             ),
+
+                            if (_hasGstBreakdown) ...[
+                              const SizedBox(height: 16),
+                              Divider(color: kLuxBorder, height: 1),
+                              const SizedBox(height: 16),
+                              _gstBreakdown(),
+                            ],
+
                             const SizedBox(height: 16),
                             Divider(color: kLuxBorder, height: 1),
                             const SizedBox(height: 16),
@@ -594,6 +602,70 @@ class _ETicketScreenState extends State<ETicketScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  bool get _hasGstBreakdown {
+    final taxable = widget.booking['taxable_amount'];
+    final tax = widget.booking['tax'];
+    return taxable is num && tax is num && taxable > 0;
+  }
+
+  Widget _gstBreakdown() {
+    final taxable = (widget.booking['taxable_amount'] as num).toDouble();
+    final tax = (widget.booking['tax'] as num).toDouble();
+    final cgst = tax / 2;
+    final sgst = tax / 2;
+    final ratePercent = taxable > 0 ? (tax / taxable * 100) : 0;
+    final halfRate = (ratePercent / 2).toStringAsFixed(1);
+
+    Widget row(String label, String value, {bool bold = false}) => Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: bold ? kDark : kLuxMuted,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: bold ? kDark : kLuxMuted,
+              fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'GST BREAKUP',
+          style: GoogleFonts.poppins(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: kTrueSaffronDark,
+            letterSpacing: 0.5,
+          ),
+        ),
+        const SizedBox(height: 8),
+        row('Taxable Amount', 'Rs.${taxable.toStringAsFixed(0)}'),
+        row('CGST ($halfRate%)', 'Rs.${cgst.toStringAsFixed(0)}'),
+        row('SGST ($halfRate%)', 'Rs.${sgst.toStringAsFixed(0)}'),
+        row(
+          'Total GST (${ratePercent.toStringAsFixed(0)}%)',
+          'Rs.${tax.toStringAsFixed(0)}',
+          bold: true,
+        ),
+      ],
     );
   }
 

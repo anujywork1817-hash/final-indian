@@ -51,9 +51,9 @@ func main() {
 	})
 
 	r.HEAD("/health", func(c *gin.Context) {
-    c.Status(200)
-    })
-    r.POST("/orders/create", createRazorpayOrder)
+		c.Status(200)
+	})
+	r.POST("/orders/create", createRazorpayOrder)
 	r.POST("/payments/verify", verifyPayment)
 
 	port := os.Getenv("PAYMENT_SERVICE_PORT")

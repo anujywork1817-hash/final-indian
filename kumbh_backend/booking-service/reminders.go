@@ -240,11 +240,19 @@ func sendBookingReminders() {
 		fmt.Printf("✅ Sent %d cash payment reminders\n", cashCount)
 	}
 
-// ── Auto-delete cancelled bookings older than 30 days ──
+	// ── Auto-delete cancelled bookings older than 30 days ──
+	// Bookings with an unsettled refund are retained: deleting
+	// them would erase the customer's only view of money still
+	// owed to them, and the staff context needed to pay it.
 	deleted, err := db.Exec(`
-		DELETE FROM bookings 
-		WHERE status = 'cancelled' 
-		AND updated_at < NOW() - INTERVAL '30 days'
+		DELETE FROM bookings b
+		WHERE b.status = 'cancelled'
+		  AND b.updated_at < NOW() - INTERVAL '30 days'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM refunds r
+		      WHERE r.booking_ref = b.booking_ref
+		        AND r.status IN ` + unsettledRefundStatuses + `
+		  )
 	`)
 	if err != nil {
 		fmt.Printf("⚠️ Auto-delete cancelled failed: %v\n", err)
@@ -253,5 +261,9 @@ func sendBookingReminders() {
 		if rows > 0 {
 			fmt.Printf("✅ Auto-deleted %d cancelled bookings older than 30 days\n", rows)
 		}
+	}
+
+	if blocked := countRefundBlockedBookings(); blocked > 0 {
+		fmt.Printf("📋 Retained %d cancelled booking(s) with unsettled refunds\n", blocked)
 	}
 }

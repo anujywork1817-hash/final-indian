@@ -36,6 +36,13 @@ type Booking struct {
 	IDProof     string    `json:"id_proof,omitempty"`
 	CreatedAt   time.Time `json:"created_at"`
 	Images      []string  `json:"images"`
+
+	// Refund fields, populated for cancelled bookings so the
+	// app can show the real state instead of a hardcoded
+	// "processing" badge.
+	RefundStatus  string  `json:"refund_status,omitempty"`
+	RefundAmount  float64 `json:"refund_amount"`
+	RefundMessage string  `json:"refund_message,omitempty"`
 }
 
 func createBooking(c *gin.Context) {
@@ -53,6 +60,9 @@ func createBooking(c *gin.Context) {
 		Units      int                    `json:"units"`
 		CouponCode string                 `json:"coupon_code"`
 		Addons     map[string]interface{} `json:"addons"`
+		// Optional — the app has no currency picker yet, so this
+		// is almost always absent and every booking stays INR.
+		Currency string `json:"currency"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -193,8 +203,25 @@ func createBooking(c *gin.Context) {
 		}
 	}
 
-	tax := (baseAmount - discount) * 0.12
-	totalAmount := baseAmount - discount + tax
+	// GST on tent accommodation: 12% (6% CGST + 6% SGST) for a taxable
+	// tariff of ₹7,500 or less per unit-night equivalent, 18% (9% + 9%)
+	// above that — matching the hotel-accommodation GST slabs.
+	taxableAmount := baseAmount - discount
+	gstRate := 0.12
+	if taxableAmount > 7500 {
+		gstRate = 0.18
+	}
+	tax := taxableAmount * gstRate
+	totalAmount := taxableAmount + tax
+
+	// ── Step 5b: Lock today's exchange rate, if foreign ───────
+	//
+	// HARD RULE (multi-currency Phase 3): this rate is captured
+	// ONCE, here, at booking time, and never recalculated —
+	// see currency.go. An INR booking (the only kind the app's
+	// current UI produces) locks in currency="INR", rate=1,
+	// foreign_amount=NULL, so nothing changes for it.
+	lockedCurrency, lockedRate, foreignAmount := lockExchangeRateFor(req.Currency, totalAmount)
 
 	// ── Step 6: Generate unique booking ref ───────────────────
 	ref := fmt.Sprintf("KTB-2027-%05d", rand.Intn(99999))
@@ -206,14 +233,16 @@ func createBooking(c *gin.Context) {
 			(booking_ref, phone, tent_id, tent_name, location, class,
 			 check_in, check_out, nights, guests, units,
 			 base_amount, coupon_code, discount, tax, total_amount, status,
-			 guest_name, guest_phone, id_proof, bed_type, gender_preference, addons)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17,$18,$19,$20,$21,$22)
+			 guest_name, guest_phone, id_proof, bed_type, gender_preference, addons,
+			 currency, exchange_rate, foreign_amount)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17,$18,$19,$20,$21,$22,$23,$24,$25)
 		RETURNING id
 	`, ref, phone, req.TentID, tentName, location, class,
 		req.CheckIn, req.CheckOut,
 		nights, req.Guests, req.Units,
 		baseAmount, couponCode, discount, tax, totalAmount,
 		guestName, guestPhone, idProof, bedType, genderPref, string(addonsJSON),
+		lockedCurrency, lockedRate, foreignAmount,
 	).Scan(&bookingID)
 
 	if err != nil {
@@ -266,9 +295,12 @@ func myBookings(c *gin.Context) {
 		       b.total_amount, b.status, COALESCE(b.payment_id,''),
 		       COALESCE(b.guest_name,''), COALESCE(b.guest_phone,''), COALESCE(b.id_proof,''),
 		       b.created_at,
-		       COALESCE(t.images::text, '[]')
+		       COALESCE(t.images::text, '[]'),
+		       COALESCE(r.status, ''),
+		       COALESCE(r.refund_amount_paise, 0)
 		FROM bookings b
 		LEFT JOIN tents t ON t.id = b.tent_id
+		LEFT JOIN refunds r ON r.booking_ref = b.booking_ref
 		WHERE b.phone = $1
 		ORDER BY b.created_at DESC
 	`, phone)
@@ -282,6 +314,8 @@ func myBookings(c *gin.Context) {
 	for rows.Next() {
 		var b Booking
 		var imagesStr string
+		var refundStatus string
+		var refundPaise int64
 		rows.Scan(
 			&b.ID, &b.BookingRef, &b.Phone, &b.TentID, &b.TentName,
 			&b.Location, &b.Class,
@@ -290,11 +324,22 @@ func myBookings(c *gin.Context) {
 			&b.TotalAmount, &b.Status, &b.PaymentID,
 			&b.GuestName, &b.GuestPhone, &b.IDProof,
 			&b.CreatedAt, &imagesStr,
+			&refundStatus, &refundPaise,
 		)
 		json.Unmarshal([]byte(imagesStr), &b.Images)
 		if b.Images == nil {
 			b.Images = []string{}
 		}
+
+		if refundStatus != "" {
+			b.RefundStatus = refundStatus
+			b.RefundAmount = float64(refundPaise) / 100.0
+			b.RefundMessage = (&Refund{
+				Status:       refundStatus,
+				RefundAmount: b.RefundAmount,
+			}).customerMessage()
+		}
+
 		bookings = append(bookings, b)
 	}
 
@@ -308,21 +353,68 @@ func myBookings(c *gin.Context) {
 	})
 }
 
+// cancelBooking cancels a booking and records the refund owed.
+//
+// Shape of this handler matters:
+//  1. all DB work happens in ONE transaction, with the booking
+//     row locked FOR UPDATE, so two concurrent cancels cannot
+//     both create a refund;
+//  2. the refund row is INSERTed inside that transaction, and
+//     a UNIQUE index on refunds.booking_ref makes a second
+//     insert impossible even if the lock were somehow bypassed;
+//  3. the Razorpay call happens AFTER commit, outside the
+//     transaction — a slow gateway must never hold a row lock.
+//
+// If the gateway call fails, the refund row survives as
+// 'failed' and is retried by the background worker, so money
+// owed is never silently dropped.
 func cancelBooking(c *gin.Context) {
 	phone := c.GetHeader("X-User-Phone")
+	if phone == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	ref := c.Param("ref")
 
-	var status string
-	err := db.QueryRow(`
-		SELECT status FROM bookings WHERE booking_ref = $1 AND phone = $2
-	`, ref, phone).Scan(&status)
-
+	tx, err := db.Begin()
 	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
+	// ── Lock the booking row ──────────────────────────────
+	//
+	// FOR UPDATE also serializes concurrent cancel requests for
+	// the same booking (spamming the Cancel button): the second
+	// request blocks here until the first commits, then sees
+	// status='cancelled' and is rejected below — never a double
+	// refund, even without relying solely on the refunds table's
+	// unique index.
+	var (
+		status, tentName string
+		totalAmount      float64
+		nights, tentID   int
+		checkIn          time.Time
+		paymentID        sql.NullString
+	)
+	err = tx.QueryRow(`
+		SELECT status, COALESCE(tent_name,''), total_amount, nights, tent_id, check_in, payment_id
+		FROM bookings
+		WHERE booking_ref = $1 AND phone = $2
+		FOR UPDATE
+	`, ref, phone).Scan(&status, &tentName, &totalAmount, &nights, &tentID, &checkIn, &paymentID)
+
+	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
 		return
 	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch booking"})
+		return
+	}
 
-	if status == "cancelled" {
+	if status == "cancelled" || status == "no_show" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "booking already cancelled"})
 		return
 	}
@@ -331,20 +423,156 @@ func cancelBooking(c *gin.Context) {
 		return
 	}
 
-	_, err = db.Exec(`
-		UPDATE bookings SET status = 'cancelled', updated_at = NOW()
-		WHERE booking_ref = $1 AND phone = $2
-	`, ref, phone)
+	// ── Work out what is owed, via the tiered policy ──────
+	paidPaise := paidAmountPaise(ref, status, totalAmount, paymentID)
+	policy, perr := loadCancellationPolicy(tx, tentID)
+	if perr != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load cancellation policy"})
+		return
+	}
+	result := calculateRefund(BookingForRefund{
+		BookingRef: ref,
+		PaidPaise:  paidPaise,
+		NightPaise: nightPaiseFor(paidPaise, nights),
+		CheckIn:    checkIn,
+		Status:     status,
+		Policy:     policy,
+	}, nowIST())
+	quote := RefundQuote{
+		RefundPaise: result.RefundAmountPaise,
+		FeePaise:    0,
+		Percent:     result.RefundPercent,
+		Rule:        result.TierApplied,
+	}
 
-	if err != nil {
+	// ── Cancel ────────────────────────────────────────────
+	if _, err = tx.Exec(`
+		UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), updated_at = NOW()
+		WHERE booking_ref = $1 AND phone = $2
+	`, ref, phone); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel booking"})
 		return
 	}
 
+	// ── Record the refund ─────────────────────────────────
+	//
+	// When approval is required, the refund is parked at
+	// 'awaiting_approval' and NOTHING is sent to the gateway.
+	// A human moves it to 'pending' (approve) or 'rejected'
+	// (decline) via the admin endpoints; only then does the
+	// existing execute/retry machinery pick it up.
+	refundStatus := "pending"
+	if refundPolicy.RequireApproval {
+		refundStatus = "awaiting_approval"
+	}
+	gatewayPayment := ""
+	switch {
+	case quote.RefundPaise <= 0:
+		// Nothing owed — no decision to make, so no queue entry.
+		refundStatus = "not_applicable"
+	case !paymentID.Valid || paymentID.String == "" || paymentID.String == "CASH":
+		// Paid in cash at the tent. Still needs approval first;
+		// only after that does it become a manual settlement
+		// task for staff.
+		if !refundPolicy.RequireApproval {
+			refundStatus = "manual"
+		}
+	default:
+		gatewayPayment = paymentID.String
+	}
+
+	var refundID int
+	err = tx.QueryRow(`
+		INSERT INTO refunds (
+			booking_ref, phone, tent_name, check_in,
+			razorpay_payment_id,
+			booking_amount_paise, refund_amount_paise, fee_paise,
+			policy_rule, policy_percent, status, idempotency_key,
+			requested_at
+		) VALUES ($1,$2,$3,$4,NULLIF($5,''),$6,$7,$8,$9,$10,$11,$12,NOW())
+		ON CONFLICT (booking_ref) DO NOTHING
+		RETURNING id
+	`,
+		ref, phone, tentName, checkIn,
+		gatewayPayment,
+		paidPaise, quote.RefundPaise, quote.FeePaise,
+		quote.Rule, quote.Percent, refundStatus,
+		fmt.Sprintf("refund_%s", ref),
+	).Scan(&refundID)
+
+	alreadyExisted := false
+	if err == sql.ErrNoRows {
+		// ON CONFLICT DO NOTHING fired: a refund for this
+		// booking already exists. Not an error — it is the
+		// double-execution guard doing its job.
+		alreadyExisted = true
+		if err = tx.QueryRow(
+			`SELECT id, refund_amount_paise, status FROM refunds WHERE booking_ref = $1`, ref,
+		).Scan(&refundID, &quote.RefundPaise, &refundStatus); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read existing refund"})
+			return
+		}
+	} else if err != nil {
+		fmt.Printf("⚠️  could not record refund for %s: %v\n", ref, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record refund"})
+		return
+	}
+
+	if !alreadyExisted {
+		if _, aerr := tx.Exec(`
+			INSERT INTO refund_audit_log
+				(booking_ref, event, tier_applied, refund_amount_paise, penalty_amount_paise, triggered_by)
+			VALUES ($1,'CANCELLED',$2,$3,$4,$5)
+		`, ref, result.TierApplied, result.RefundAmountPaise, result.PenaltyAmountPaise, "user:"+phone); aerr != nil {
+			// Never block a cancellation on the audit trail — log
+			// loudly and continue; the refund itself is already
+			// durably recorded in the refunds table above.
+			fmt.Printf("⚠️  could not write audit log for %s: %v\n", ref, aerr)
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit cancellation"})
+		return
+	}
+
+	// ── Gateway call: AFTER commit, no locks held ─────────
+	//
+	// Only 'pending' dispatches. 'awaiting_approval' waits for a
+	// human — this is the whole point of the gate.
+	if refundStatus == "pending" && !alreadyExisted {
+		go executeRefund(refundID)
+	}
+
+	message := "Booking cancelled successfully"
+	switch {
+	case quote.RefundPaise <= 0:
+		// leave the plain message
+	case refundStatus == "awaiting_approval":
+		message = fmt.Sprintf(
+			"Booking cancelled. Your refund request for ₹%.2f has been sent to our team for approval. "+
+				"Once approved, the amount is credited to your original payment method within %s working days.",
+			float64(quote.RefundPaise)/100, refundPolicy.SettlementDays,
+		)
+	default:
+		message = fmt.Sprintf(
+			"Booking cancelled. ₹%.2f will be credited to your original payment method within %s working days.",
+			float64(quote.RefundPaise)/100, refundPolicy.SettlementDays,
+		)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":     "Booking cancelled successfully",
-		"booking_ref": ref,
-		"status":      "cancelled",
+		"message":           message,
+		"booking_ref":       ref,
+		"status":            "cancelled",
+		"refund_amount":     float64(quote.RefundPaise) / 100,
+		"penalty_amount":    float64(result.PenaltyAmountPaise) / 100,
+		"refund_status":     refundStatus,
+		"requires_approval": refundStatus == "awaiting_approval",
+		"tier_applied":      result.TierApplied,
+		"policy_rule":       quote.Rule,
+		"policy_percent":    quote.Percent,
+		"settlement_days":   refundPolicy.SettlementDays,
 	})
 }
 
@@ -451,14 +679,42 @@ func deleteBooking(c *gin.Context) {
 		return
 	}
 
-	if status != "cancelled" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "only cancelled bookings can be deleted"})
+	if status != "cancelled" && status != "no_show" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "only cancelled or no-show bookings can be deleted"})
 		return
 	}
 
-	_, err = db.Exec(`
+	// A booking whose refund has not settled must not be
+	// removed — the user would lose all visibility of money
+	// they are still owed, and staff would lose the context
+	// needed to chase it.
+	var unsettled string
+	err = db.QueryRow(`
+		SELECT status FROM refunds
+		WHERE booking_ref = $1 AND status IN `+unsettledRefundStatuses,
+		ref).Scan(&unsettled)
+
+	if err == nil {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":         "cannot remove a booking with a refund still in progress",
+			"refund_status": unsettled,
+		})
+		return
+	}
+	if err != sql.ErrNoRows {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to check refund status"})
+		return
+	}
+
+	// Note: the refunds row (if any) is deliberately NOT
+	// deleted. It is a financial record and outlives the
+	// booking; it carries its own snapshot of the details.
+	if _, err = db.Exec(`
 		DELETE FROM payments WHERE booking_ref = $1
-	`, ref)
+	`, ref); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete payment records"})
+		return
+	}
 
 	_, err = db.Exec(`
 		DELETE FROM bookings WHERE booking_ref = $1 AND phone = $2
@@ -540,6 +796,18 @@ func adminUpdateBookingStatus(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update status"})
 		return
 	}
+
+	// A cash booking is confirmed here (not via payment-service's
+	// verifyPayment), so this is the only trigger point for its
+	// confirmation email and invoice.
+	if req.Status == "confirmed" {
+		go sendConfirmationEmailForBooking(ref)
+		go generateInvoiceForBooking(ref)
+	}
+
+	admin, _ := adminRoleFromToken(c)
+	logAdminAction(admin, "BOOKING_STATUS_CHANGED", "booking", ref, "status="+req.Status)
+
 	c.JSON(http.StatusOK, gin.H{"message": "Status updated", "booking_ref": ref, "status": req.Status})
 }
 
@@ -596,7 +864,6 @@ func adminWeeklyRevenue(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"revenue": revenue})
 }
 
-
 // GET /admin/coupons — all coupons
 func adminGetCoupons(c *gin.Context) {
 	rows, err := db.Query(`
@@ -649,7 +916,9 @@ func adminCreateCoupon(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.MaxUses == 0 { req.MaxUses = 100 }
+	if req.MaxUses == 0 {
+		req.MaxUses = 100
+	}
 
 	_, err := db.Exec(`
 		INSERT INTO coupons (code, description, discount, min_amount, max_uses, used_count, is_active, expires_at)
@@ -660,6 +929,8 @@ func adminCreateCoupon(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create coupon: " + err.Error()})
 		return
 	}
+	admin, _ := adminRoleFromToken(c)
+	logAdminAction(admin, "COUPON_CREATED", "coupon", req.Code, "")
 	c.JSON(http.StatusCreated, gin.H{"message": "Coupon created successfully"})
 }
 
@@ -671,6 +942,8 @@ func adminToggleCoupon(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to toggle coupon"})
 		return
 	}
+	admin, _ := adminRoleFromToken(c)
+	logAdminAction(admin, "COUPON_TOGGLED", "coupon", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Coupon status toggled"})
 }
 
@@ -682,8 +955,11 @@ func adminDeleteCoupon(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete coupon"})
 		return
 	}
+	admin, _ := adminRoleFromToken(c)
+	logAdminAction(admin, "COUPON_DELETED", "coupon", id, "")
 	c.JSON(http.StatusOK, gin.H{"message": "Coupon deleted"})
 }
+
 // POST /admin/notifications/send — broadcast notification to users
 func adminSendNotification(c *gin.Context) {
 	var req struct {
@@ -749,24 +1025,62 @@ func adminSendNotification(c *gin.Context) {
 
 // DELETE /admin/bookings/cancelled — clear cancelled bookings older than 30 days
 func adminClearCancelledBookings(c *gin.Context) {
+	// Bookings with an unsettled refund are skipped — see
+	// deleteBooking for why.
 	result, err := db.Exec(`
-		DELETE FROM bookings 
-		WHERE status = 'cancelled' 
-		AND updated_at < NOW() - INTERVAL '30 days'
+		DELETE FROM bookings b
+		WHERE b.status = 'cancelled'
+		  AND b.updated_at < NOW() - INTERVAL '30 days'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM refunds r
+		      WHERE r.booking_ref = b.booking_ref
+		        AND r.status IN ` + unsettledRefundStatuses + `
+		  )
 	`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear bookings"})
 		return
 	}
 	rows, _ := result.RowsAffected()
-	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Cleared %d cancelled bookings", rows), "deleted": rows})
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Cleared %d cancelled bookings", rows),
+		"deleted": rows,
+		"skipped": countRefundBlockedBookings(),
+	})
+}
+
+// countRefundBlockedBookings reports how many cancelled
+// bookings were retained because money is still owed.
+func countRefundBlockedBookings() int {
+	var n int
+	db.QueryRow(`
+		SELECT COUNT(*) FROM bookings b
+		JOIN refunds r ON r.booking_ref = b.booking_ref
+		WHERE b.status = 'cancelled'
+		  AND r.status IN ` + unsettledRefundStatuses).Scan(&n)
+	return n
 }
 func adminClearAllCancelledBookings(c *gin.Context) {
-	result, err := db.Exec(`DELETE FROM bookings WHERE status = 'cancelled'`)
+	skipped := countRefundBlockedBookings()
+
+	result, err := db.Exec(`
+		DELETE FROM bookings b
+		WHERE b.status = 'cancelled'
+		  AND NOT EXISTS (
+		      SELECT 1 FROM refunds r
+		      WHERE r.booking_ref = b.booking_ref
+		        AND r.status IN ` + unsettledRefundStatuses + `
+		  )
+	`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to clear bookings"})
 		return
 	}
 	rows, _ := result.RowsAffected()
-	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("Cleared %d cancelled bookings", rows), "deleted": rows})
+	c.JSON(http.StatusOK, gin.H{
+		"message": fmt.Sprintf("Cleared %d cancelled bookings", rows),
+		"deleted": rows,
+		"skipped": skipped,
+		"note":    "bookings with an unsettled refund are retained until the refund settles",
+	})
 }

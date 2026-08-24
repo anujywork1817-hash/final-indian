@@ -60,8 +60,8 @@ func main() {
 		})
 	})
 	r.HEAD("/health", func(c *gin.Context) {
-    c.Status(200)
-    })
+		c.Status(200)
+	})
 
 	// ── Public routes ────────────────────────────
 	r.POST("/api/v1/auth/send-otp", proxy(authURL+"/auth/send-otp"))
@@ -76,29 +76,115 @@ func main() {
 	r.GET("/api/v1/coupons", proxy(bookingURL+"/coupons"))
 
 	r.POST("/api/v1/auth/kyc", proxy(authURL+"/auth/kyc"))
-    r.POST("/api/v1/auth/admin/login", proxy(authURL+"/auth/admin/login"))
-    r.POST("/api/v1/auth/admin/change-password", proxy(authURL+"/auth/admin/change-password"))
+	r.POST("/api/v1/auth/admin/login", proxy(authURL+"/auth/admin/login"))
+	r.POST("/api/v1/auth/admin/change-password", proxy(authURL+"/auth/admin/change-password"))
 	r.POST("/api/v1/auth/admin/change-username", proxy(authURL+"/auth/admin/change-username"))
+	r.GET("/api/v1/auth/admin/list", proxy(authURL+"/auth/admin/list"))
+	r.POST("/api/v1/auth/admin/create", proxy(authURL+"/auth/admin/create"))
 	r.GET("/api/v1/admin/bookings", proxy(bookingURL+"/admin/bookings"))
-    r.PUT("/api/v1/admin/bookings/:ref/status", func(c *gin.Context) { proxy(bookingURL+"/admin/bookings/"+c.Param("ref")+"/status")(c) })
-    r.GET("/api/v1/admin/stats", proxy(bookingURL+"/admin/stats"))
-    r.GET("/api/v1/admin/revenue/weekly", proxy(bookingURL+"/admin/revenue/weekly"))
-    r.GET("/api/v1/admin/users", proxy(authURL+"/admin/users"))
-    
-	r.PUT("/api/v1/admin/users/:phone/block", func(c *gin.Context) { proxy(authURL+"/admin/users/"+c.Param("phone")+"/block")(c) })
+	r.PUT("/api/v1/admin/bookings/:ref/status", func(c *gin.Context) { proxy(bookingURL + "/admin/bookings/" + c.Param("ref") + "/status")(c) })
+	r.GET("/api/v1/admin/stats", proxy(bookingURL+"/admin/stats"))
+	r.GET("/api/v1/admin/revenue/weekly", proxy(bookingURL+"/admin/revenue/weekly"))
+	r.GET("/api/v1/admin/finance/dashboard", proxy(bookingURL+"/admin/finance/dashboard"))
+	r.GET("/api/v1/admin/finance/bookings/:ref/accounting", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/finance/bookings/" + c.Param("ref") + "/accounting")(c)
+	})
+	r.GET("/api/v1/admin/finance/bookings/:ref/audit-log", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/finance/bookings/" + c.Param("ref") + "/audit-log")(c)
+	})
+	r.GET("/api/v1/admin/payments", proxy(bookingURL+"/admin/payments"))
+	r.POST("/api/v1/admin/bookings/:ref/payments", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/bookings/" + c.Param("ref") + "/payments")(c)
+	})
+	r.GET("/api/v1/admin/revenue/summary", proxy(bookingURL+"/admin/revenue/summary"))
+	r.GET("/api/v1/admin/customer-receivables", proxy(bookingURL+"/admin/customer-receivables"))
+
+	// ── Finance & Accounting (Phase 3) ────────────────
+	r.POST("/api/v1/admin/expenses", proxy(bookingURL+"/admin/expenses"))
+	r.GET("/api/v1/admin/expenses", proxy(bookingURL+"/admin/expenses"))
+	r.POST("/api/v1/admin/expenses/:id/reverse", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/expenses/" + c.Param("id") + "/reverse")(c)
+	})
+	r.GET("/api/v1/admin/vendor-payables", proxy(bookingURL+"/admin/vendor-payables"))
+	r.POST("/api/v1/admin/expenses/:id/mark-paid", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/expenses/" + c.Param("id") + "/mark-paid")(c)
+	})
+	r.GET("/api/v1/admin/exchange-rates", proxy(bookingURL+"/admin/exchange-rates"))
+	r.PUT("/api/v1/admin/exchange-rates/:currency", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/exchange-rates/" + c.Param("currency"))(c)
+	})
+	r.GET("/api/v1/admin/finance/fx-report", proxy(bookingURL+"/admin/finance/fx-report"))
+
+	// ── Finance & Accounting (Phase 4) ────────────────
+	r.GET("/api/v1/admin/gateway-summary", proxy(bookingURL+"/admin/gateway-summary"))
+	r.GET("/api/v1/admin/reconciliation", proxy(bookingURL+"/admin/reconciliation"))
+	r.GET("/api/v1/admin/reconciliation/exceptions", proxy(bookingURL+"/admin/reconciliation/exceptions"))
+	r.POST("/api/v1/admin/bookings/:ref/bank-settlement", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/bookings/" + c.Param("ref") + "/bank-settlement")(c)
+	})
+	r.GET("/api/v1/admin/gateway-settings", proxy(bookingURL+"/admin/gateway-settings"))
+	r.PUT("/api/v1/admin/gateway-settings/:gateway", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/gateway-settings/" + c.Param("gateway"))(c)
+	})
+
+	// ── Finance & Accounting (Phase 5) ────────────────
+	r.GET("/api/v1/admin/finance/pnl", proxy(bookingURL+"/admin/finance/pnl"))
+	r.GET("/api/v1/admin/finance/gst-report", proxy(bookingURL+"/admin/finance/gst-report"))
+	r.GET("/api/v1/admin/invoices", proxy(bookingURL+"/admin/invoices"))
+	r.GET("/api/v1/admin/invoices/:id", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/invoices/" + c.Param("id"))(c)
+	})
+	r.GET("/api/v1/admin/invoices/:id/pdf", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/invoices/" + c.Param("id") + "/pdf")(c)
+	})
+	r.POST("/api/v1/admin/invoices/:id/email", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/invoices/" + c.Param("id") + "/email")(c)
+	})
+	r.POST("/api/v1/admin/invoices/:id/credit-note", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/invoices/" + c.Param("id") + "/credit-note")(c)
+	})
+	r.POST("/api/v1/admin/invoices/:id/debit-note", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/invoices/" + c.Param("id") + "/debit-note")(c)
+	})
+
+	// ── Finance & Accounting (Phase 6) ────────────────
+	r.GET("/api/v1/admin/ledger", proxy(bookingURL+"/admin/ledger"))
+	r.GET("/api/v1/admin/bank-accounts", proxy(bookingURL+"/admin/bank-accounts"))
+	r.GET("/api/v1/admin/audit-log", proxy(bookingURL+"/admin/audit-log"))
+	r.GET("/api/v1/admin/reports/:type", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/reports/" + c.Param("type"))(c)
+	})
+	r.GET("/api/v1/admin/users", proxy(authURL+"/admin/users"))
+
+	r.PUT("/api/v1/admin/users/:phone/block", func(c *gin.Context) { proxy(authURL + "/admin/users/" + c.Param("phone") + "/block")(c) })
 	r.GET("/api/v1/admin/tents", proxy(tentURL+"/admin/tents"))
-    r.POST("/api/v1/admin/tents", proxy(tentURL+"/admin/tents"))
-    r.PUT("/api/v1/admin/tents/:id", func(c *gin.Context) { proxy(tentURL+"/admin/tents/"+c.Param("id"))(c) })
-    r.DELETE("/api/v1/admin/tents/:id", func(c *gin.Context) { proxy(tentURL+"/admin/tents/"+c.Param("id"))(c) })
-    r.GET("/api/v1/admin/coupons", proxy(bookingURL+"/admin/coupons"))
-    r.POST("/api/v1/admin/coupons", proxy(bookingURL+"/admin/coupons"))
-    r.PUT("/api/v1/admin/coupons/:id/toggle", func(c *gin.Context) { proxy(bookingURL+"/admin/coupons/"+c.Param("id")+"/toggle")(c) })
-    r.DELETE("/api/v1/admin/coupons/:id", func(c *gin.Context) { proxy(bookingURL+"/admin/coupons/"+c.Param("id"))(c) })
+	r.POST("/api/v1/admin/tents", proxy(tentURL+"/admin/tents"))
+	r.PUT("/api/v1/admin/tents/:id", func(c *gin.Context) { proxy(tentURL + "/admin/tents/" + c.Param("id"))(c) })
+	r.DELETE("/api/v1/admin/tents/:id", func(c *gin.Context) { proxy(tentURL + "/admin/tents/" + c.Param("id"))(c) })
+	r.GET("/api/v1/admin/coupons", proxy(bookingURL+"/admin/coupons"))
+	r.POST("/api/v1/admin/coupons", proxy(bookingURL+"/admin/coupons"))
+	r.PUT("/api/v1/admin/coupons/:id/toggle", func(c *gin.Context) { proxy(bookingURL + "/admin/coupons/" + c.Param("id") + "/toggle")(c) })
+	r.DELETE("/api/v1/admin/coupons/:id", func(c *gin.Context) { proxy(bookingURL + "/admin/coupons/" + c.Param("id"))(c) })
 	r.POST("/api/v1/admin/notifications/send", proxy(bookingURL+"/admin/notifications/send"))
 	r.GET("/api/v1/admin/kyc", proxy(authURL+"/admin/kyc"))
-    r.PUT("/api/v1/admin/kyc/:phone/verify", func(c *gin.Context) { proxy(authURL+"/admin/kyc/"+c.Param("phone")+"/verify")(c) })
+	r.PUT("/api/v1/admin/kyc/:phone/verify", func(c *gin.Context) { proxy(authURL + "/admin/kyc/" + c.Param("phone") + "/verify")(c) })
 	r.DELETE("/api/v1/admin/bookings/cancelled", proxy(bookingURL+"/admin/bookings/cancelled"))
 	r.DELETE("/api/v1/admin/bookings/cancelled/all", proxy(bookingURL+"/admin/bookings/cancelled/all"))
+
+	// ── Admin refunds ────────────────────────────
+	r.GET("/api/v1/admin/refunds", proxy(bookingURL+"/admin/refunds"))
+	r.POST("/api/v1/admin/refunds/:ref/approve", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/refunds/" + c.Param("ref") + "/approve")(c)
+	})
+	r.POST("/api/v1/admin/refunds/:ref/reject", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/refunds/" + c.Param("ref") + "/reject")(c)
+	})
+	r.POST("/api/v1/admin/refunds/:ref/retry", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/refunds/" + c.Param("ref") + "/retry")(c)
+	})
+	r.POST("/api/v1/admin/refunds/:ref/settle", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/refunds/" + c.Param("ref") + "/settle")(c)
+	})
 	// ── Protected routes (JWT required) ──────────
 	protected := r.Group("/api/v1")
 	protected.Use(jwtMiddleware())
@@ -111,6 +197,14 @@ func main() {
 		// ✅ DELETE booking (only cancelled bookings)
 		protected.DELETE("/bookings/:ref", func(c *gin.Context) {
 			proxy(bookingURL + "/bookings/" + c.Param("ref"))(c)
+		})
+		// Refund state for one of the caller's own bookings.
+		protected.GET("/bookings/:ref/refund", func(c *gin.Context) {
+			proxy(bookingURL + "/bookings/" + c.Param("ref") + "/refund")(c)
+		})
+		// Preview the refund before confirming a cancellation.
+		protected.GET("/bookings/:ref/refund-quote", func(c *gin.Context) {
+			proxy(bookingURL + "/bookings/" + c.Param("ref") + "/refund-quote")(c)
 		})
 		protected.POST("/coupons/validate", proxy(bookingURL+"/coupons/validate"))
 		protected.POST("/orders/create", proxy(paymentURL+"/orders/create"))
@@ -158,7 +252,19 @@ func proxy(target string) gin.HandlerFunc {
 		}
 		defer resp.Body.Close()
 		respBody, _ := io.ReadAll(resp.Body)
-		c.Data(resp.StatusCode, "application/json", respBody)
+
+		// Pass through the backend's real Content-Type (e.g.
+		// application/pdf for invoice downloads) instead of
+		// assuming every response is JSON, and forward
+		// Content-Disposition so the browser keeps the filename.
+		contentType := resp.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/json"
+		}
+		if disposition := resp.Header.Get("Content-Disposition"); disposition != "" {
+			c.Header("Content-Disposition", disposition)
+		}
+		c.Data(resp.StatusCode, contentType, respBody)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -130,17 +131,32 @@ func verifyPayment(c *gin.Context) {
 		return
 	}
 
-	// Fetch booking amount and tent name
-	var amount float64
-	var tentName string
+	// Fetch booking details needed for the confirmation email/push/invoice
+	var (
+		amount, baseAmount, discount, tax float64
+		tentName, location, currency      string
+		checkInDate                       time.Time
+		checkOutDate                      time.Time
+		nights, guests                    int
+		guestName                         sql.NullString
+	)
 	err := db.QueryRow(`
-		SELECT total_amount, tent_name FROM bookings 
+		SELECT total_amount, tent_name, COALESCE(location,''),
+		       check_in, check_out, nights, guests, guest_name,
+		       base_amount, discount, tax, currency
+		FROM bookings
 		WHERE booking_ref = $1 AND phone = $2
-	`, req.BookingRef, phone).Scan(&amount, &tentName)
+	`, req.BookingRef, phone).Scan(
+		&amount, &tentName, &location,
+		&checkInDate, &checkOutDate, &nights, &guests, &guestName,
+		&baseAmount, &discount, &tax, &currency,
+	)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
 		return
 	}
+	checkIn := checkInDate.Format("2 Jan 2006")
+	checkOut := checkOutDate.Format("2 Jan 2006")
 
 	// Save payment record
 	_, err = db.Exec(`
@@ -182,6 +198,37 @@ func verifyPayment(c *gin.Context) {
 			)
 		}
 	}()
+
+	// ── Send booking confirmation email ────────────────────
+	go func() {
+		var userEmail string
+		if err := db.QueryRow(`
+			SELECT COALESCE(email, '') FROM users WHERE phone = $1
+		`, phone).Scan(&userEmail); err == nil && userEmail != "" {
+			sendBookingConfirmationEmail(
+				userEmail, guestName.String, req.BookingRef, tentName, location,
+				checkIn, checkOut, nights, guests, amount,
+			)
+		}
+	}()
+
+	// ── Generate the invoice ───────────────────────────────
+	// (ISO dates here, not the "2 Jan 2006" display format used
+	// for the email — this goes into a DATE column.)
+	go generateInvoiceForBooking(
+		req.BookingRef, phone, tentName, location, currency,
+		checkInDate.Format("2006-01-02"), checkOutDate.Format("2006-01-02"), guestName.String,
+		baseAmount, discount, tax, amount,
+	)
+
+	// ── Post the ledger entry ──────────────────────────────
+	// Bank/Gateway Dr, Customer/Revenue Cr — the exact example
+	// from the accounting module's spec.
+	go postLedgerPair(
+		time.Now().Format("2006-01-02"), "booking_payment", req.BookingRef,
+		"Bank/Gateway", "Customer/Revenue", amount,
+		fmt.Sprintf("Payment for %s (%s)", tentName, req.BookingRef),
+	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":     "Payment verified! Booking confirmed 🪔",

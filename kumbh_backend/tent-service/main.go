@@ -51,8 +51,8 @@ func main() {
 	})
 
 	r.HEAD("/health", func(c *gin.Context) {
-    c.Status(200)
-    })
+		c.Status(200)
+	})
 
 	r.GET("/tents", listTents)
 	r.GET("/tents/:id", getTent)
@@ -62,9 +62,9 @@ func main() {
 	r.GET("/tents/:id/reviews", getReviews)
 
 	r.GET("/admin/tents", adminGetTents)
-    r.POST("/admin/tents", adminCreateTent)
-    r.PUT("/admin/tents/:id", adminUpdateTent)
-    r.DELETE("/admin/tents/:id", adminDeleteTent)
+	r.POST("/admin/tents", adminCreateTent)
+	r.PUT("/admin/tents/:id", adminUpdateTent)
+	r.DELETE("/admin/tents/:id", adminDeleteTent)
 
 	port := os.Getenv("TENT_SERVICE_PORT")
 	if port == "" {

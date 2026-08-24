@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -31,68 +32,73 @@ const _storage = FlutterSecureStorage();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
-  await Firebase.initializeApp();
+  // Firebase (push notifications) — Android/iOS only.
+  // Skipped on web: this app's auth/booking flows go through the Go backend,
+  // not Firebase, so Firebase is only needed for FCM push notifications,
+  // which aren't set up for this web deployment.
+  if (!kIsWeb) {
+    await Firebase.initializeApp();
 
-  // Set background message handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    // Set background message handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Initialize local notifications
-  await flutterLocalNotificationsPlugin
-      .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin
-      >()
-      ?.createNotificationChannel(channel);
+    // Initialize local notifications
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.createNotificationChannel(channel);
 
-  const AndroidInitializationSettings androidSettings =
-      AndroidInitializationSettings('@mipmap/ic_launcher');
-  const InitializationSettings initSettings = InitializationSettings(
-    android: androidSettings,
-  );
-  await flutterLocalNotificationsPlugin.initialize(initSettings);
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings = InitializationSettings(
+      android: androidSettings,
+    );
+    await flutterLocalNotificationsPlugin.initialize(settings: initSettings);
 
-  // Request notification permission
-  await FirebaseMessaging.instance.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+    // Request notification permission
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
 
-  // Get FCM token and save locally only
-  // Will be sent to backend after user logs in
-  final token = await FirebaseMessaging.instance.getToken();
-  print('FCM Token: $token');
-  if (token != null) {
-    await _storage.write(key: 'fcm_token', value: token);
-  }
-
-  // Listen for token refresh — save locally
-  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-    await _storage.write(key: 'fcm_token', value: newToken);
-  });
-
-  // Handle foreground messages
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    final notification = message.notification;
-    final android = message.notification?.android;
-    if (notification != null && android != null) {
-      flutterLocalNotificationsPlugin.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            channel.id,
-            channel.name,
-            channelDescription: channel.description,
-            importance: Importance.high,
-            priority: Priority.high,
-            icon: '@mipmap/ic_launcher',
-          ),
-        ),
-      );
+    // Get FCM token and save locally only
+    // Will be sent to backend after user logs in
+    final token = await FirebaseMessaging.instance.getToken();
+    print('FCM Token: $token');
+    if (token != null) {
+      await _storage.write(key: 'fcm_token', value: token);
     }
-  });
+
+    // Listen for token refresh — save locally
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      await _storage.write(key: 'fcm_token', value: newToken);
+    });
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final notification = message.notification;
+      final android = message.notification?.android;
+      if (notification != null && android != null) {
+        flutterLocalNotificationsPlugin.show(
+          id: notification.hashCode,
+          title: notification.title,
+          body: notification.body,
+          notificationDetails: NotificationDetails(
+            android: AndroidNotificationDetails(
+              channel.id,
+              channel.name,
+              channelDescription: channel.description,
+              importance: Importance.high,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            ),
+          ),
+        );
+      }
+    });
+  }
 
   runApp(const ProviderScope(child: KumbhTentApp()));
 }
@@ -109,4 +115,4 @@ class KumbhTentApp extends StatelessWidget {
       home: const SplashScreen(),
     );
   }
-}
+} 

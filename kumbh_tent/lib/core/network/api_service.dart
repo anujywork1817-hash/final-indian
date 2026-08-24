@@ -1,8 +1,17 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:kumbh_tent/core/constants/constants.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://myapp-backend-env-1.eba-njsam29m.ap-south-1.elasticbeanstalk.com/api/v1';
+  // Kept identical to kBaseUrl in core/constants/constants.dart:
+  // screens are split between this Dio client and the raw http
+  // package, so a mismatch sends half the app to one backend and
+  // half to another.
+  static const String baseUrl = kBaseUrl;
+
+  // Production / staging — swap both here and in constants.dart.
+  //static const String baseUrl = 'https://d3dmb495g7jwhi.cloudfront.net/api/v1';
+  //static const String baseUrl = 'https://kumbh-gateway.onrender.com/api/v1';
 
   static final Dio _dio = Dio(
     BaseOptions(
@@ -172,6 +181,34 @@ class ApiService {
     await setAuthHeader();
     final res = await _dio.put('/bookings/$bookingRef/cancel');
     return res.data;
+  }
+
+  // ── Refunds ───────────────────────────────────────────────────
+
+  /// Previews what cancelling this booking would return, so the
+  /// confirmation dialog can state a real number instead of a
+  /// guess. Returns null if the quote can't be fetched — callers
+  /// should fall back to a generic message rather than block.
+  static Future<Map<String, dynamic>?> getRefundQuote(String bookingRef) async {
+    try {
+      await setAuthHeader();
+      final res = await _dio.get('/bookings/$bookingRef/refund-quote');
+      return Map<String, dynamic>.from(res.data);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Fetches the recorded refund for a cancelled booking.
+  /// Returns null when no refund exists (HTTP 404).
+  static Future<Map<String, dynamic>?> getRefund(String bookingRef) async {
+    try {
+      await setAuthHeader();
+      final res = await _dio.get('/bookings/$bookingRef/refund');
+      return Map<String, dynamic>.from(res.data['refund']);
+    } catch (e) {
+      return null;
+    }
   }
 
   // ── Coupons ───────────────────────────────────────────────────
