@@ -144,9 +144,9 @@ class _KYCScreenState extends State<KYCScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: kTrueSaffron.withOpacity(0.08),
+                  color: kTrueSaffron.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: kTrueSaffron.withOpacity(0.3)),
+                  border: Border.all(color: kTrueSaffron.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -194,7 +194,7 @@ class _KYCScreenState extends State<KYCScreen> {
                           ),
                           decoration: BoxDecoration(
                             color: _selectedIdType == idType['value']
-                                ? kTrueSaffron.withOpacity(0.1)
+                                ? kTrueSaffron.withValues(alpha: 0.1)
                                 : kLuxGoldSoft,
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
@@ -271,10 +271,12 @@ class _KYCScreenState extends State<KYCScreen> {
                         ),
                       ),
                       validator: (val) {
-                        if (val == null || val.trim().isEmpty)
+                        if (val == null || val.trim().isEmpty) {
                           return 'Please enter your ID number';
-                        if (val.trim().length < 6)
+                        }
+                        if (val.trim().length < 6) {
                           return 'ID number is too short';
+                        }
                         return null;
                       },
                     ),
@@ -369,8 +371,8 @@ class _KYCScreenState extends State<KYCScreen> {
         subtitle = 'Your identity has been verified successfully.';
         break;
       case 'pending':
-        bgColor = kTrueSaffron.withOpacity(0.08);
-        borderColor = kTrueSaffron.withOpacity(0.3);
+        bgColor = kTrueSaffron.withValues(alpha: 0.08);
+        borderColor = kTrueSaffron.withValues(alpha: 0.3);
         textColor = kTrueSaffronDark;
         icon = Icons.hourglass_top;
         title = 'Verification Pending';

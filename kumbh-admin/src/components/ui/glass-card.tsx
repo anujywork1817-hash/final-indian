@@ -1,6 +1,6 @@
 // component.tsx
 import * as React from "react";
-import { Instagram, Twitter, Github, ChevronDown } from "lucide-react";
+import { Camera, MessageCircle, Code2, ChevronDown } from "lucide-react";
 
 const ULogo = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -39,9 +39,9 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
           <div className="absolute bottom-5 left-5 right-5 flex items-center justify-between [transform-style:preserve-3d] [transform:translate3d(0,0,26px)]">
             <div className="flex gap-2.5 [transform-style:preserve-3d]">
               {[
-                { icon: Instagram, delay: "400ms" },
-                { icon: Twitter, delay: "600ms" },
-                { icon: Github, delay: "800ms" },
+                { icon: Camera, delay: "400ms" },
+                { icon: MessageCircle, delay: "600ms" },
+                { icon: Code2, delay: "800ms" },
               ].map(({ icon: Icon, delay }, index) => (
                 <button
                   key={index}

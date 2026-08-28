@@ -59,12 +59,22 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigate() async {
     final token = await _storage.read(key: 'auth_token');
     if (!mounted) return;
+    // The rest of the app uses a white background, so the light
+    // status bar icons set above for this (dark/saffron) splash
+    // screen would otherwise stay applied — invisible on white —
+    // for every screen after this one.
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (_, __, ___) =>
+        pageBuilder: (context, animation, secondaryAnimation) =>
             token != null ? HomeScreen() : PhoneLoginScreen(),
-        transitionsBuilder: (_, anim, __, child) =>
+        transitionsBuilder: (context, anim, secondaryAnimation, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 500),
       ),
@@ -95,7 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
             Center(
               child: AnimatedBuilder(
                 animation: _ringAnim,
-                builder: (_, __) => Stack(
+                builder: (context, child) => Stack(
                   alignment: Alignment.center,
                   children: [
                     _ring(320, (0.06 * _ringAnim.value * 255).round()),
@@ -128,10 +138,10 @@ class _SplashScreenState extends State<SplashScreen>
                       height: 210,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: Colors.white.withOpacity(0.06),
+                        color: Colors.white.withValues(alpha: 0.06),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             blurRadius: 30,
                             spreadRadius: 5,
                           ),

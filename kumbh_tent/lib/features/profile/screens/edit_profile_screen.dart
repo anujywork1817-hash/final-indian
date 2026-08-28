@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -16,6 +17,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   bool _isSaving = false;
+  bool _isSaved = false;
   bool _isLoading = true;
   String _phone = '';
 
@@ -23,6 +25,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _loadProfile();
+    // Live avatar preview: rebuild as the user types their name.
+    _nameController.addListener(() => setState(() {}));
   }
 
   Future<void> _loadProfile() async {
@@ -48,9 +52,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  String get _initials {
+    final trimmed = _nameController.text.trim();
+    if (trimmed.isEmpty) return 'G';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    final first = parts.first.isNotEmpty ? parts.first[0] : '';
+    final second = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : '';
+    return (first + second).toUpperCase();
+  }
+
   Future<void> _saveProfile() async {
     if (_nameController.text.trim().isEmpty) {
-      _snack('Please enter your name', Colors.red);
+      _snack('Please enter your name', AppColors.error);
       return;
     }
     setState(() => _isSaving = true);
@@ -68,12 +81,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         value: _emailController.text.trim(),
       );
       if (mounted) {
-        _snack('Profile updated! ✅', Colors.green);
-        Navigator.pop(context, true);
+        setState(() {
+          _isSaving = false;
+          _isSaved = true;
+        });
+        await Future.delayed(const Duration(milliseconds: 700));
+        if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) _snack('Failed to update profile: $e', Colors.red);
-    } finally {
+      if (mounted) _snack('Failed to update profile: $e', AppColors.error);
       if (mounted) setState(() => _isSaving = false);
     }
   }
@@ -100,175 +116,307 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
-      appBar: AppBar(
-        backgroundColor: kTrueSaffron,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text(
-          'Edit Profile',
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+      backgroundColor: AppColors.background,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kTrueSaffron))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.saffron),
+            )
+          : SafeArea(
+              top: false,
+              child: SingleChildScrollView(
               child: Column(
                 children: [
-                  // ── Avatar ───────────────────────────────────
-                  Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: kTrueSaffron.withOpacity(0.15),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: kTrueSaffron.withOpacity(0.4),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Center(
-                      child: Text('🙏', style: TextStyle(fontSize: 36)),
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── Form card ────────────────────────────────
-                  _card(
+                  _gradientHeader(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 48, 20, 24),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _field(
-                          'Full Name',
-                          'Enter your full name',
-                          _nameController,
+                        // ── Form card ────────────────────────────
+                        _card(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _field(
+                                'Full Name',
+                                'Enter your full name',
+                                _nameController,
+                                icon: Icons.person_outline_rounded,
+                              ),
+                              _divider(),
+                              _field(
+                                'Email (optional)',
+                                'Enter your email',
+                                _emailController,
+                                icon: Icons.mail_outline_rounded,
+                                keyboardType: TextInputType.emailAddress,
+                              ),
+                              _divider(),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Phone Number',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 14,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.softSurface,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.lock_outline_rounded,
+                                          size: 16,
+                                          color: AppColors.textMuted,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Text(
+                                          '+91 $_phone',
+                                          style: GoogleFonts.poppins(
+                                            fontSize: 14,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Phone number cannot be changed',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                        _divider(),
-                        _field(
-                          'Email (optional)',
-                          'Enter your email',
-                          _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                        ),
-                        _divider(),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Phone Number',
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: kTrueSaffron,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                color: kTrueSaffron.withOpacity(0.05),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: kLuxBorder),
-                              ),
-                              child: Text(
-                                '+91 $_phone',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 14,
-                                  color: kLuxMuted,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Phone number cannot be changed',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: kLuxMuted,
-                              ),
-                            ),
-                          ],
+
+                        const SizedBox(height: 28),
+
+                        // ── Animated save button ──────────────────
+                        SizedBox(
+                          width: double.infinity,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            transitionBuilder: (child, anim) =>
+                                ScaleTransition(scale: anim, child: child),
+                            child: _isSaved
+                                ? Container(
+                                    key: const ValueKey('saved'),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success,
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(
+                                          Icons.check_circle_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Profile Saved',
+                                          style: GoogleFonts.poppins(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : _isSaving
+                                ? Container(
+                                    key: const ValueKey('saving'),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.saffron.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: const Center(
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.2,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : PremiumButton(
+                                    key: const ValueKey('save'),
+                                    label: 'Save Profile',
+                                    icon: Icons.check_rounded,
+                                    verticalPadding: 16,
+                                    onPressed: _saveProfile,
+                                  ),
+                          ),
                         ),
                       ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-
-                  // ── Save button ──────────────────────────────
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kTrueSaffron,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        elevation: 0,
-                      ),
-                      onPressed: _isSaving ? null : _saveProfile,
-                      child: _isSaving
-                          ? const CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            )
-                          : Text(
-                              'Save Profile',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
-                              ),
-                            ),
                     ),
                   ),
                 ],
               ),
             ),
+            ),
+    );
+  }
+
+  Widget _gradientHeader() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 60),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.saffron, AppColors.saffronDark],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(32)),
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+                Expanded(
+                  child: Text(
+                    'Edit Profile',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 32),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // ── Live avatar preview ─────────────────────────────
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 84,
+                  height: 84,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      width: 3,
+                    ),
+                  ),
+                  child: Center(
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      child: Text(
+                        _initials,
+                        key: ValueKey(_initials),
+                        style: GoogleFonts.poppins(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: -2,
+                  bottom: -2,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldWarm,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.camera_alt_rounded,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _card({required Widget child}) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: kLuxGoldSoft,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: kTrueSaffron.withOpacity(0.2)),
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: AppColors.cardBorder),
       boxShadow: [
         BoxShadow(
-          color: kTrueSaffron.withOpacity(0.06),
-          blurRadius: 10,
-          offset: const Offset(0, 4),
+          color: Colors.black.withValues(alpha: 0.08),
+          blurRadius: 20,
+          offset: const Offset(0, 6),
         ),
       ],
     ),
     child: child,
   );
 
-  Widget _divider() => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 12),
-    child: Divider(color: kLuxBorder, thickness: 1, height: 1),
+  Widget _divider() => const Padding(
+    padding: EdgeInsets.symmetric(vertical: 14),
+    child: Divider(color: AppColors.border, thickness: 1, height: 1),
   );
 
   Widget _field(
     String label,
     String hint,
     TextEditingController controller, {
+    required IconData icon,
     TextInputType keyboardType = TextInputType.text,
   }) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,32 +424,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Text(
         label,
         style: GoogleFonts.poppins(
-          fontSize: 14,
+          fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: kTrueSaffron,
+          color: AppColors.textPrimary,
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 10),
       TextField(
         controller: controller,
         keyboardType: keyboardType,
-        style: GoogleFonts.poppins(fontSize: 14, color: kDark),
+        style: GoogleFonts.poppins(
+          fontSize: 14,
+          color: AppColors.textPrimary,
+        ),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: GoogleFonts.poppins(color: kLuxMuted, fontSize: 13),
+          hintStyle: GoogleFonts.poppins(
+            color: AppColors.textMuted,
+            fontSize: 13,
+          ),
+          prefixIcon: Icon(icon, size: 18, color: AppColors.saffron),
           filled: true,
-          fillColor: kLuxCream,
+          fillColor: AppColors.softSurface,
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: kLuxBorder),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: kLuxBorder),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: kTrueSaffron, width: 1.8),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.saffron, width: 1.8),
           ),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 14,

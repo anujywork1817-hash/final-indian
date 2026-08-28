@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 
@@ -76,9 +77,9 @@ class ApiService {
     if (fcmToken != null) {
       try {
         await _dio.post('/fcm-token', data: {'fcm_token': fcmToken});
-        print('✅ FCM token updated successfully');
+        debugPrint('✅ FCM token updated successfully');
       } catch (e) {
-        print('⚠️ FCM token update after login failed: $e');
+        debugPrint('⚠️ FCM token update after login failed: $e');
       }
     }
     return res.data;
@@ -164,8 +165,8 @@ class ApiService {
         'check_out': checkOut,
         'guests': guests,
         'units': units,
-        if (couponCode != null) 'coupon_code': couponCode,
-        if (addons != null) 'addons': addons,
+        'coupon_code': ?couponCode,
+        'addons': ?addons,
       },
     );
     return res.data;

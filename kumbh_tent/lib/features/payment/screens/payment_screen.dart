@@ -7,7 +7,9 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/booking/screens/e_ticket_screen.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class PaymentScreen extends StatefulWidget {
   final Map<String, dynamic> tent;
@@ -143,10 +145,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Confirm Cash Payment',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -154,15 +160,20 @@ class _PaymentScreenState extends State<PaymentScreen> {
           children: [
             Text(
               'You have chosen to pay at the tent on arrival.',
-              style: GoogleFonts.poppins(fontSize: 13),
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withAlpha(20),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orange.withAlpha(60)),
+                color: AppColors.goldWarm.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.goldWarm.withValues(alpha: 0.3),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -172,7 +183,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Colors.orange.shade800,
+                      color: AppColors.saffronDark,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -183,7 +194,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     '• Bring this e-ticket to the camp',
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      color: Colors.orange.shade900,
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
@@ -196,16 +207,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: Colors.grey),
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
             ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kSaffron,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
             onPressed: () {
               Navigator.pop(context);
               _goToETicket(status: 'pending', paymentId: 'CASH');
@@ -214,13 +219,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 _sendWhatsAppConfirmation(status: 'pending');
               });
             },
-            child: Text(
-              'Confirm',
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+            child: const Text('Confirm'),
           ),
         ],
       ),
@@ -287,7 +286,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         'description':
             '${widget.tent['name']} • $_nights nights • ${widget.guests} guests',
         'prefill': {'contact': _userPhone, 'email': ''},
-        'theme': {'color': '#FF6B00'},
+        'theme': {'color': '#E85D04'},
         'notes': {
           'booking_ref': widget.bookingRef,
           'tent_id': widget.tent['id']?.toString() ?? '',
@@ -303,7 +302,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e', style: GoogleFonts.poppins()),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -345,7 +344,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               'Verification error: $e',
               style: GoogleFonts.poppins(),
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
           ),
         );
       }
@@ -360,7 +359,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           'Payment failed: ${response.message}',
           style: GoogleFonts.poppins(),
         ),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
       ),
     );
   }
@@ -372,7 +371,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
           'External wallet: ${response.walletName}',
           style: GoogleFonts.poppins(),
         ),
-        backgroundColor: kSaffron,
+        backgroundColor: AppColors.saffron,
       ),
     );
   }
@@ -406,36 +405,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kCream,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: kDeepOrange,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Text(
           'Payment',
           style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Order Summary ─────────────────────────────────
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.cardBorder),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(8),
-                    blurRadius: 10,
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -446,23 +441,27 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   Text(
                     'Order Summary',
                     style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: kDark,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Row(
                     children: [
                       Container(
                         width: 52,
                         height: 52,
                         decoration: BoxDecoration(
-                          color: (widget.tent['color'] as Color).withAlpha(40),
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [AppColors.saffron, AppColors.goldWarm],
+                          ),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: const Center(
-                          child: Text('⛺', style: TextStyle(fontSize: 26)),
+                          child: Text('⛺', style: TextStyle(fontSize: 24)),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -473,16 +472,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                             Text(
                               widget.tent['name'],
                               style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: kDark,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                             Text(
                               widget.tent['location'],
                               style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: Colors.grey,
+                                fontSize: 12,
+                                color: AppColors.textMuted,
                               ),
                             ),
                           ],
@@ -490,9 +489,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
-                  const Divider(height: 1),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
+                  const Divider(height: 1, color: AppColors.border),
+                  const SizedBox(height: 14),
                   _summaryRow(
                     '📅 Check-in',
                     '${widget.checkIn.day} ${_monthName(widget.checkIn.month)} ${widget.checkIn.year}',
@@ -506,7 +505,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                   _summaryRow('⛺ Tents', '${widget.units}'),
                   if (widget.couponCode != null)
                     _summaryRow('🎟 Coupon', widget.couponCode!),
-                  const Divider(height: 20),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Divider(color: AppColors.border, height: 1),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -514,16 +516,16 @@ class _PaymentScreenState extends State<PaymentScreen> {
                         'Total Amount',
                         style: GoogleFonts.poppins(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: kDark,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       Text(
                         '₹${widget.totalAmount.toStringAsFixed(0)}',
                         style: GoogleFonts.poppins(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          color: kSaffron,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.saffronDark,
                         ),
                       ),
                     ],
@@ -532,30 +534,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
             Text(
               'Payment Method',
               style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: kDark,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
 
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.cardBorder),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withAlpha(8),
-                    blurRadius: 10,
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 16,
                     offset: const Offset(0, 4),
                   ),
                 ],
               ),
+              clipBehavior: Clip.antiAlias,
               child: Column(
                 children: [
                   _paymentMethodTile(
@@ -564,28 +568,48 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     title: 'UPI',
                     subtitle: 'GPay, PhonePe, Paytm & more',
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  const Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: AppColors.border,
+                  ),
                   _paymentMethodTile(
                     key: 'card',
                     icon: '💳',
                     title: 'Credit / Debit Card',
                     subtitle: 'Visa, Mastercard, RuPay',
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  const Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: AppColors.border,
+                  ),
                   _paymentMethodTile(
                     key: 'netbanking',
                     icon: '🏦',
                     title: 'Net Banking',
                     subtitle: 'All major banks supported',
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  const Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: AppColors.border,
+                  ),
                   _paymentMethodTile(
                     key: 'wallet',
                     icon: '👛',
                     title: 'Wallets',
                     subtitle: 'Paytm, Amazon Pay & more',
                   ),
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  const Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: AppColors.border,
+                  ),
                   _paymentMethodTile(
                     key: 'cash',
                     icon: '💵',
@@ -600,26 +624,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
             if (_selectedMethod == 'cash')
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withAlpha(15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withAlpha(50)),
+                  color: AppColors.goldWarm.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.goldWarm.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.info_outline,
-                      color: Colors.orange,
+                      Icons.info_outline_rounded,
+                      color: AppColors.saffronDark,
                       size: 18,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         'You will receive a booking confirmation on WhatsApp. Pay ₹${widget.totalAmount.toStringAsFixed(0)} in cash at check-in.',
                         style: GoogleFonts.poppins(
                           fontSize: 11,
-                          color: Colors.orange.shade800,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -628,26 +654,28 @@ class _PaymentScreenState extends State<PaymentScreen> {
               )
             else
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: Colors.green.withAlpha(15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.withAlpha(50)),
+                  color: AppColors.success.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.success.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Row(
                   children: [
                     const Icon(
                       Icons.lock_outline_rounded,
-                      color: Colors.green,
+                      color: AppColors.success,
                       size: 18,
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         '100% secure payment powered by Razorpay. Booking confirmation will be sent on WhatsApp.',
                         style: GoogleFonts.poppins(
                           fontSize: 11,
-                          color: Colors.green.shade700,
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -655,43 +683,48 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 ),
               ),
 
-            const SizedBox(height: 80),
+            const SizedBox(height: 100),
           ],
         ),
       ),
 
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(15),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
-            ),
-          ],
-        ),
-        child: ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: kSaffron,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 16),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, -4),
+              ),
+            ],
           ),
-          onPressed: _isProcessing ? null : _onProceed,
           child: _isProcessing
-              ? const CircularProgressIndicator(color: Colors.white)
-              : Text(
-                  _selectedMethod == 'cash'
+              ? Container(
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: AppColors.textMuted.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  ),
+                )
+              : PremiumButton(
+                  label: _selectedMethod == 'cash'
                       ? 'Confirm — Pay ₹${widget.totalAmount.toStringAsFixed(0)} at Tent 🪔'
                       : 'Pay ₹${widget.totalAmount.toStringAsFixed(0)} Online 🪔',
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                  ),
+                  verticalPadding: 16,
+                  onPressed: _onProceed,
                 ),
         ),
       ),
@@ -705,14 +738,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
       children: [
         Text(
           label,
-          style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey),
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppColors.textMuted,
+          ),
         ),
         Text(
           value,
           style: GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: kDark,
+            color: AppColors.textPrimary,
           ),
         ),
       ],
@@ -726,20 +762,32 @@ class _PaymentScreenState extends State<PaymentScreen> {
     required String subtitle,
   }) {
     final isSelected = _selectedMethod == key;
-    final isCash = key == 'cash';
     return GestureDetector(
       onTap: () => setState(() => _selectedMethod = key),
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: isSelected
-              ? (isCash ? Colors.orange.withAlpha(15) : kSaffron.withAlpha(10))
+              ? AppColors.saffron.withValues(alpha: 0.06)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
           children: [
-            Text(icon, style: const TextStyle(fontSize: 24)),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.saffron.withValues(alpha: 0.12)
+                    : AppColors.softSurface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Center(
+                child: Text(icon, style: const TextStyle(fontSize: 19)),
+              ),
+            ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -750,14 +798,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: kDark,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   Text(
                     subtitle,
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      color: Colors.grey,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
@@ -769,17 +817,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected
-                      ? (isCash ? Colors.orange : kSaffron)
-                      : Colors.grey.shade300,
+                  color: isSelected ? AppColors.saffron : AppColors.border,
                   width: 2,
                 ),
               ),
               child: isSelected
                   ? Container(
                       margin: const EdgeInsets.all(3),
-                      decoration: BoxDecoration(
-                        color: isCash ? Colors.orange : kSaffron,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [AppColors.saffron, AppColors.saffronDark],
+                        ),
                         shape: BoxShape.circle,
                       ),
                     )

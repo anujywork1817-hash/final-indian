@@ -8,7 +8,9 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'package:kumbh_tent/core/constants/constants.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
+import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class ETicketScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -50,9 +52,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
       final file = await _captureTicket();
       if (file == null) throw Exception('Failed to capture ticket');
       await Gal.putImage(file.path);
-      if (mounted) _snack('Ticket saved to gallery!', Colors.green);
+      if (mounted) _snack('Ticket saved to gallery!', AppColors.success);
     } catch (e) {
-      if (mounted) _snack('Error: $e', Colors.red);
+      if (mounted) _snack('Error: $e', AppColors.error);
     } finally {
       if (mounted) setState(() => _isDownloading = false);
     }
@@ -67,14 +69,16 @@ class _ETicketScreenState extends State<ETicketScreen> {
       final tent = widget.booking['tent'] ?? '';
       final checkIn = widget.booking['check_in'] ?? '';
       final checkOut = widget.booking['check_out'] ?? '';
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text:
-            'My Kumbh Tent Booking\nRef: $ref\n$tent\n$checkIn to $checkOut\nNashik Kumbh 2027',
-        subject: 'Kumbh Tent Booking - $ref',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text:
+              'My Kumbh Tent Booking\nRef: $ref\n$tent\n$checkIn to $checkOut\nNashik Kumbh 2027',
+          subject: 'Kumbh Tent Booking - $ref',
+        ),
       );
     } catch (e) {
-      if (mounted) _snack('Error sharing: $e', Colors.red);
+      if (mounted) _snack('Error sharing: $e', AppColors.error);
     } finally {
       if (mounted) setState(() => _isSharing = false);
     }
@@ -104,37 +108,29 @@ class _ETicketScreenState extends State<ETicketScreen> {
     final isConfirmed = status == 'confirmed';
     final isPending = status == 'pending';
     final isCancelled = status == 'cancelled';
-    final statusColor = isConfirmed
-        ? Colors.green
+    final badgeStyle = isConfirmed
+        ? PremiumBadgeStyle.success
         : isPending
-        ? Colors.orange
+        ? PremiumBadgeStyle.gold
         : isCancelled
-        ? Colors.red
-        : Colors.blue;
+        ? PremiumBadgeStyle.danger
+        : PremiumBadgeStyle.dark;
     final statusLabel = isConfirmed
-        ? 'Booking Confirmed'
+        ? 'BOOKING CONFIRMED'
         : isPending
-        ? 'Payment Pending - Pay at Tent'
+        ? 'PAYMENT PENDING - PAY AT TENT'
         : isCancelled
-        ? 'Booking Cancelled'
-        : 'Completed';
+        ? 'BOOKING CANCELLED'
+        : 'COMPLETED';
 
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: kTrueSaffron,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Text(
           'E-Ticket',
           style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
         actions: [
@@ -145,40 +141,26 @@ class _ETicketScreenState extends State<ETicketScreen> {
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: AppColors.saffron,
                       strokeWidth: 2,
                     ),
                   ),
                 )
               : IconButton(
-                  icon: const Icon(Icons.share_outlined, color: Colors.white),
+                  icon: const Icon(Icons.share_outlined),
                   onPressed: _shareTicket,
                 ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: SafeArea(
+        child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
         child: Column(
           children: [
             // ── Status banner ─────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: statusColor.withOpacity(0.3)),
-              ),
-              child: Center(
-                child: Text(
-                  statusLabel,
-                  style: GoogleFonts.poppins(
-                    color: statusColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
+            Align(
+              alignment: Alignment.center,
+              child: PremiumBadge(label: statusLabel, style: badgeStyle),
             ),
 
             const SizedBox(height: 20),
@@ -187,20 +169,25 @@ class _ETicketScreenState extends State<ETicketScreen> {
             RepaintBoundary(
               key: _ticketKey,
               child: Container(
-                color: kTrueSaffronPale,
+                color: AppColors.background,
+                child: Stack(
+                  children: [
+                    Opacity(
+                      opacity: isCancelled ? 0.55 : 1,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: kLuxGoldSoft,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: kTrueSaffron.withOpacity(0.2)),
+                    border: Border.all(color: AppColors.cardBorder),
                     boxShadow: [
                       BoxShadow(
-                        color: kTrueSaffron.withOpacity(0.1),
-                        blurRadius: 20,
-                        offset: const Offset(0, 6),
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 24,
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
+                  clipBehavior: Clip.antiAlias,
                   child: Column(
                     children: [
                       // Ticket header
@@ -208,12 +195,9 @@ class _ETicketScreenState extends State<ETicketScreen> {
                         padding: const EdgeInsets.all(20),
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [kTrueSaffronDark, kTrueSaffron],
+                            colors: [AppColors.saffron, AppColors.saffronDark],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(24),
                           ),
                         ),
                         child: Column(
@@ -221,7 +205,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                             Row(
                               children: [
                                 const Text(
-                                  '\u26fa',
+                                  '⛺',
                                   style: TextStyle(fontSize: 32),
                                 ),
                                 const SizedBox(width: 12),
@@ -242,7 +226,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                         style: GoogleFonts.poppins(
                                           color: Colors.white,
                                           fontSize: 18,
-                                          fontWeight: FontWeight.w800,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ],
@@ -254,11 +238,13 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(
+                                      alpha: 0.2,
+                                    ),
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
-                                    '\u26fa ${widget.booking['class']?.toString().toUpperCase() ?? 'TENT'}',
+                                    '⛺ ${widget.booking['class']?.toString().toUpperCase() ?? 'TENT'}',
                                     style: GoogleFonts.poppins(
                                       color: Colors.white,
                                       fontSize: 10,
@@ -274,7 +260,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                               style: GoogleFonts.poppins(
                                 color: Colors.white,
                                 fontSize: 16,
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                             const SizedBox(height: 4),
@@ -317,7 +303,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 Container(
                                   width: 1,
                                   height: 40,
-                                  color: kLuxBorder,
+                                  color: AppColors.border,
                                 ),
                                 _detailItem(
                                   'Check-out',
@@ -326,7 +312,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 Container(
                                   width: 1,
                                   height: 40,
-                                  color: kLuxBorder,
+                                  color: AppColors.border,
                                 ),
                                 _detailItem(
                                   'Nights',
@@ -335,7 +321,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                               ],
                             ),
                             const SizedBox(height: 16),
-                            Divider(color: kLuxBorder, height: 1),
+                            const Divider(color: AppColors.border, height: 1),
                             const SizedBox(height: 16),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -346,31 +332,31 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 ),
                                 _detailItem(
                                   'Total',
-                                  'Rs.${widget.booking['total'] ?? '-'}',
+                                  '₹${widget.booking['total'] ?? '-'}',
                                 ),
                               ],
                             ),
 
                             if (_hasGstBreakdown) ...[
                               const SizedBox(height: 16),
-                              Divider(color: kLuxBorder, height: 1),
+                              const Divider(
+                                color: AppColors.border,
+                                height: 1,
+                              ),
                               const SizedBox(height: 16),
                               _gstBreakdown(),
                             ],
 
                             const SizedBox(height: 16),
-                            Divider(color: kLuxBorder, height: 1),
+                            const Divider(color: AppColors.border, height: 1),
                             const SizedBox(height: 16),
 
                             // Booking ref box
                             Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(14),
                               decoration: BoxDecoration(
-                                color: kTrueSaffron.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: kTrueSaffron.withOpacity(0.2),
-                                ),
+                                color: AppColors.softSurface,
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               child: Row(
                                 mainAxisAlignment:
@@ -384,15 +370,15 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                         'Booking Reference',
                                         style: GoogleFonts.poppins(
                                           fontSize: 11,
-                                          color: kLuxMuted,
+                                          color: AppColors.textMuted,
                                         ),
                                       ),
                                       Text(
                                         widget.booking['ref'] ?? '',
                                         style: GoogleFonts.poppins(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w800,
-                                          color: kTrueSaffronDark,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.saffronDark,
                                           letterSpacing: 1,
                                         ),
                                       ),
@@ -407,17 +393,24 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                       );
                                       _snack(
                                         'Booking ref copied!',
-                                        Colors.green,
+                                        AppColors.success,
                                       );
                                     },
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
-                                        horizontal: 10,
-                                        vertical: 6,
+                                        horizontal: 12,
+                                        vertical: 8,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: kTrueSaffron,
-                                        borderRadius: BorderRadius.circular(8),
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            AppColors.saffron,
+                                            AppColors.saffronDark,
+                                          ],
+                                        ),
+                                        borderRadius: BorderRadius.circular(
+                                          10,
+                                        ),
                                       ),
                                       child: Text(
                                         'Copy',
@@ -444,46 +437,75 @@ class _ETicketScreenState extends State<ETicketScreen> {
                         child: Column(
                           children: [
                             Text(
-                              'Scan at Entry Gate',
+                              isCancelled
+                                  ? 'Ticket Void'
+                                  : 'Scan at Entry Gate',
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: kLuxMuted,
+                                color: isCancelled
+                                    ? AppColors.error
+                                    : AppColors.textPrimary,
                               ),
                             ),
                             const SizedBox(height: 16),
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: kTrueSaffron.withOpacity(0.2),
-                                  width: 2,
+                            Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Opacity(
+                                  opacity: isCancelled ? 0.25 : 1,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: AppColors.cardBorder,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: QrImageView(
+                                      data: qrData,
+                                      version: QrVersions.auto,
+                                      size: 200,
+                                      backgroundColor: Colors.white,
+                                      eyeStyle: const QrEyeStyle(
+                                        eyeShape: QrEyeShape.square,
+                                        color: AppColors.saffronDark,
+                                      ),
+                                      dataModuleStyle:
+                                          const QrDataModuleStyle(
+                                            dataModuleShape:
+                                                QrDataModuleShape.square,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              child: QrImageView(
-                                data: qrData,
-                                version: QrVersions.auto,
-                                size: 200,
-                                backgroundColor: Colors.white,
-                                eyeStyle: const QrEyeStyle(
-                                  eyeShape: QrEyeShape.square,
-                                  color: kTrueSaffronDark,
-                                ),
-                                dataModuleStyle: const QrDataModuleStyle(
-                                  dataModuleShape: QrDataModuleShape.square,
-                                  color: kDark,
-                                ),
-                              ),
+                                if (isCancelled)
+                                  Icon(
+                                    Icons.block_rounded,
+                                    color: AppColors.error.withValues(
+                                      alpha: 0.85,
+                                    ),
+                                    size: 72,
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 12),
                             Text(
-                              'Show this QR code at the camp entrance',
+                              isCancelled
+                                  ? 'This ticket has been cancelled and is not valid for entry.'
+                                  : 'Show this QR code at the camp entrance',
                               textAlign: TextAlign.center,
                               style: GoogleFonts.poppins(
                                 fontSize: 11,
-                                color: kLuxMuted,
+                                fontWeight: isCancelled
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
+                                color: isCancelled
+                                    ? AppColors.error
+                                    : AppColors.textMuted,
                               ),
                             ),
                           ],
@@ -492,22 +514,19 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
                       // Footer
                       Container(
+                        width: double.infinity,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,
                           vertical: 14,
                         ),
-                        decoration: BoxDecoration(
-                          color: kTrueSaffron.withOpacity(0.06),
-                          borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(24),
-                          ),
+                        decoration: const BoxDecoration(
+                          color: AppColors.softSurface,
                         ),
-
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Text(
-                              '\u26fa',
+                              '⛺',
                               style: TextStyle(fontSize: 14),
                             ),
                             const SizedBox(width: 6),
@@ -516,7 +535,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
                                 'Kumbh Tent Booking - Nashik Kumbh 2027',
                                 style: GoogleFonts.poppins(
                                   fontSize: 11,
-                                  color: kLuxMuted,
+                                  color: AppColors.textMuted,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -526,6 +545,48 @@ class _ETicketScreenState extends State<ETicketScreen> {
                       ),
                     ],
                   ),
+                ),
+                    ),
+                    if (isCancelled)
+                      Positioned.fill(
+                        child: Center(
+                          child: Transform.rotate(
+                            angle: -0.45,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.error,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(
+                                      alpha: 0.25,
+                                    ),
+                                    blurRadius: 12,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                'CANCELLED',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.white,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 3,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -538,68 +599,28 @@ class _ETicketScreenState extends State<ETicketScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: kTrueSaffron),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                      foregroundColor: AppColors.saffron,
+                      side: const BorderSide(color: AppColors.saffron),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
                     onPressed: _isSharing ? null : _shareTicket,
-                    icon: Icon(
-                      Icons.share_outlined,
-                      color: kTrueSaffron,
-                      size: 18,
-                    ),
-                    label: Text(
-                      'Share',
-                      style: GoogleFonts.poppins(
-                        color: kTrueSaffron,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
+                    icon: const Icon(Icons.share_outlined, size: 18),
+                    label: const Text('Share'),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: kTrueSaffron,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      elevation: 0,
-                    ),
+                  child: PremiumButton(
+                    label: _isDownloading ? 'Saving...' : 'Download',
+                    icon: _isDownloading ? null : Icons.download_rounded,
+                    verticalPadding: 14,
                     onPressed: _isDownloading ? null : _downloadTicket,
-                    icon: _isDownloading
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Icon(
-                            Icons.download_rounded,
-                            color: Colors.white,
-                          ),
-                    label: Text(
-                      _isDownloading ? 'Saving...' : 'Download',
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 32),
           ],
+        ),
         ),
       ),
     );
@@ -628,7 +649,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
             label,
             style: GoogleFonts.poppins(
               fontSize: 11,
-              color: bold ? kDark : kLuxMuted,
+              color: bold ? AppColors.textPrimary : AppColors.textMuted,
               fontWeight: bold ? FontWeight.w700 : FontWeight.w400,
             ),
           ),
@@ -636,7 +657,7 @@ class _ETicketScreenState extends State<ETicketScreen> {
             value,
             style: GoogleFonts.poppins(
               fontSize: 11,
-              color: bold ? kDark : kLuxMuted,
+              color: bold ? AppColors.textPrimary : AppColors.textMuted,
               fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
             ),
           ),
@@ -652,17 +673,17 @@ class _ETicketScreenState extends State<ETicketScreen> {
           style: GoogleFonts.poppins(
             fontSize: 10,
             fontWeight: FontWeight.w700,
-            color: kTrueSaffronDark,
+            color: AppColors.saffronDark,
             letterSpacing: 0.5,
           ),
         ),
         const SizedBox(height: 8),
-        row('Taxable Amount', 'Rs.${taxable.toStringAsFixed(0)}'),
-        row('CGST ($halfRate%)', 'Rs.${cgst.toStringAsFixed(0)}'),
-        row('SGST ($halfRate%)', 'Rs.${sgst.toStringAsFixed(0)}'),
+        row('Taxable Amount', '₹${taxable.toStringAsFixed(0)}'),
+        row('CGST ($halfRate%)', '₹${cgst.toStringAsFixed(0)}'),
+        row('SGST ($halfRate%)', '₹${sgst.toStringAsFixed(0)}'),
         row(
           'Total GST (${ratePercent.toStringAsFixed(0)}%)',
-          'Rs.${tax.toStringAsFixed(0)}',
+          '₹${tax.toStringAsFixed(0)}',
           bold: true,
         ),
       ],
@@ -671,14 +692,17 @@ class _ETicketScreenState extends State<ETicketScreen> {
 
   Widget _detailItem(String label, String value) => Column(
     children: [
-      Text(label, style: GoogleFonts.poppins(fontSize: 10, color: kLuxMuted)),
+      Text(
+        label,
+        style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+      ),
       const SizedBox(height: 4),
       Text(
         value,
         style: GoogleFonts.poppins(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          color: kDark,
+          color: AppColors.textPrimary,
         ),
       ),
     ],
@@ -696,14 +720,14 @@ class _DashedDivider extends StatelessWidget {
           width: 20,
           height: 20,
           decoration: BoxDecoration(
-            color: kTrueSaffronPale,
+            color: AppColors.background,
             borderRadius: const BorderRadius.horizontal(
               right: Radius.circular(10),
             ),
-            border: Border(
-              top: BorderSide(color: kLuxBorder),
-              right: BorderSide(color: kLuxBorder),
-              bottom: BorderSide(color: kLuxBorder),
+            border: const Border(
+              top: BorderSide(color: AppColors.border),
+              right: BorderSide(color: AppColors.border),
+              bottom: BorderSide(color: AppColors.border),
             ),
           ),
         ),
@@ -718,8 +742,11 @@ class _DashedDivider extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: List.generate(
                   dashCount,
-                  (_) =>
-                      Container(width: dashWidth, height: 1, color: kLuxBorder),
+                  (_) => Container(
+                    width: dashWidth,
+                    height: 1,
+                    color: AppColors.border,
+                  ),
                 ),
               );
             },
@@ -729,14 +756,14 @@ class _DashedDivider extends StatelessWidget {
           width: 20,
           height: 20,
           decoration: BoxDecoration(
-            color: kTrueSaffronPale,
+            color: AppColors.background,
             borderRadius: const BorderRadius.horizontal(
               left: Radius.circular(10),
             ),
-            border: Border(
-              top: BorderSide(color: kLuxBorder),
-              left: BorderSide(color: kLuxBorder),
-              bottom: BorderSide(color: kLuxBorder),
+            border: const Border(
+              top: BorderSide(color: AppColors.border),
+              left: BorderSide(color: AppColors.border),
+              bottom: BorderSide(color: AppColors.border),
             ),
           ),
         ),

@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kumbh_tent/features/booking/screens/booking_form_screen.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
 import 'package:kumbh_tent/features/booking/widgets/cancellation_policy_badge.dart';
+import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
+import 'package:kumbh_tent/shared/widgets/wishlist_button.dart';
+import 'package:kumbh_tent/shared/widgets/tent_image_carousel.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class TentDetailScreen extends StatefulWidget {
   final Map<String, dynamic> tent;
@@ -46,51 +50,26 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
   Widget build(BuildContext context) {
     final tent = widget.tent;
     final bool isSurge = tent['is_surge'] == true;
-    final Color color = tent['color'] as Color;
+    final tentId = tent['id']?.toString() ?? '';
 
-    final List<String> rawImages = List<String>.from(tent['images'] ?? []);
-    final List<Map<String, String>> tentImages = rawImages
-        .asMap()
-        .entries
-        .map((e) => {'url': e.value, 'label': 'Photo ${e.key + 1}'})
-        .toList();
+    final List<String> images = List<String>.from(tent['images'] ?? []);
 
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
+      backgroundColor: AppColors.background,
       body: CustomScrollView(
         slivers: [
-          // ── Hero AppBar ─────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 320,
-            pinned: true,
-            backgroundColor: kTrueSaffron,
-            leading: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                margin: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.85),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.arrow_back_ios_new,
-                  color: kDark,
-                  size: 18,
-                ),
-              ),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              background: _TentHeroImage(
-                color: color,
-                tentClass: tent['class'],
-                images: tentImages,
-              ),
+          // ── Hero image carousel ──────────────────────────────
+          SliverToBoxAdapter(
+            child: _HeroGallery(
+              images: images,
+              tentClass: '${tent['class']}',
+              tentId: tentId,
             ),
           ),
 
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -102,9 +81,9 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                         child: Text(
                           tent['name'],
                           style: GoogleFonts.poppins(
-                            fontSize: 20,
+                            fontSize: 22,
                             fontWeight: FontWeight.w700,
-                            color: kDark,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -113,9 +92,9 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.star_rounded,
-                                color: kTrueSaffron,
+                                color: AppColors.goldWarm,
                                 size: 18,
                               ),
                               Text(
@@ -125,7 +104,7 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                                 style: GoogleFonts.poppins(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: kDark,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                             ],
@@ -134,21 +113,21 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                             '$_totalReviews reviews',
                             style: GoogleFonts.poppins(
                               fontSize: 11,
-                              color: kLuxMuted,
+                              color: AppColors.textMuted,
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
 
                   // ── Location ──────────────────────────────────
                   Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.location_on_outlined,
-                        color: kTrueSaffron,
+                        color: AppColors.saffron,
                         size: 16,
                       ),
                       const SizedBox(width: 4),
@@ -157,7 +136,7 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                           tent['location'],
                           style: GoogleFonts.poppins(
                             fontSize: 13,
-                            color: kLuxMuted,
+                            color: AppColors.textSecondary,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -166,41 +145,44 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
-                          vertical: 2,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: kTrueSaffron.withOpacity(0.1),
+                          color: AppColors.softSurface,
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: kTrueSaffron.withOpacity(0.25),
-                          ),
                         ),
                         child: Text(
                           '${tent['distance']} km from Sangam',
                           style: GoogleFonts.poppins(
                             fontSize: 11,
-                            color: kTrueSaffron,
+                            color: AppColors.textSecondary,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 18),
 
                   // ── Surge banner ──────────────────────────────
                   if (isSurge)
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        color: AppColors.error.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.error.withValues(alpha: 0.25),
+                        ),
                       ),
                       child: Row(
                         children: [
-                          const Text('🔥', style: TextStyle(fontSize: 20)),
-                          const SizedBox(width: 8),
+                          const Icon(
+                            Icons.local_fire_department_rounded,
+                            color: AppColors.error,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,8 +190,8 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                                 Text(
                                   'Surge Pricing Active',
                                   style: GoogleFonts.poppins(
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.error,
                                     fontSize: 13,
                                   ),
                                 ),
@@ -217,7 +199,9 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                                   'Price is ${tent['surge']} of base due to Kumbh peak dates',
                                   style: GoogleFonts.poppins(
                                     fontSize: 11,
-                                    color: Colors.red.shade400,
+                                    color: AppColors.error.withValues(
+                                      alpha: 0.8,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -226,21 +210,14 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                         ],
                       ),
                     ),
-                  const SizedBox(height: 16),
+                  if (isSurge) const SizedBox(height: 16),
 
                   CancellationPolicyBadge(tent: tent),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
                   // ── Amenities ─────────────────────────────────
-                  Text(
-                    'Amenities',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: kDark,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
+                  _sectionTitle('Amenities'),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 10,
                     runSpacing: 10,
@@ -249,21 +226,18 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                           (a) => Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 14,
-                              vertical: 8,
+                              vertical: 9,
                             ),
                             decoration: BoxDecoration(
-                              color: kLuxGoldSoft,
+                              color: AppColors.softSurface,
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: kTrueSaffron.withOpacity(0.2),
-                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.check_circle,
-                                  color: kTrueSaffron,
+                                const Icon(
+                                  Icons.check_circle_rounded,
+                                  color: AppColors.saffron,
                                   size: 14,
                                 ),
                                 const SizedBox(width: 6),
@@ -272,7 +246,7 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                                   style: GoogleFonts.poppins(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    color: kDark,
+                                    color: AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -281,45 +255,54 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                         )
                         .toList(),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   // ── Policies ──────────────────────────────────
-                  Text(
-                    'Policies',
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: kDark,
+                  _sectionTitle('Policies'),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.cardBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _policyRow(Icons.login_rounded, 'Check-in: 12:00 PM'),
+                        _policyRow(Icons.logout_rounded, 'Check-out: 11:00 AM'),
+                        _policyRow(
+                          Icons.cancel_outlined,
+                          'Free cancellation 48hrs before',
+                        ),
+                        _policyRow(
+                          Icons.no_meals_rounded,
+                          'No outside food allowed',
+                          isLast: true,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  _policyRow(Icons.access_time, 'Check-in: 12:00 PM'),
-                  _policyRow(Icons.logout, 'Check-out: 11:00 AM'),
-                  _policyRow(
-                    Icons.cancel_outlined,
-                    'Free cancellation 48hrs before',
-                  ),
-                  _policyRow(Icons.no_meals, 'No outside food allowed'),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 24),
 
                   // ── Reviews ───────────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'Guest Reviews',
-                        style: GoogleFonts.poppins(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: kDark,
-                        ),
-                      ),
+                      _sectionTitle('Guest Reviews'),
                       if (_totalReviews > 0)
                         Row(
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.star_rounded,
-                              color: kTrueSaffron,
+                              color: AppColors.goldWarm,
                               size: 16,
                             ),
                             Text(
@@ -327,50 +310,53 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                               style: GoogleFonts.poppins(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
-                                color: kDark,
+                                color: AppColors.textPrimary,
                               ),
                             ),
                           ],
                         ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
 
                   if (_loadingReviews)
                     const Center(
                       child: Padding(
                         padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator(color: kTrueSaffron),
+                        child: CircularProgressIndicator(
+                          color: AppColors.saffron,
+                        ),
                       ),
                     )
                   else if (_reviews.isEmpty)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: kLuxGoldSoft,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: kTrueSaffron.withOpacity(0.2),
-                        ),
+                        color: AppColors.softSurface,
+                        borderRadius: BorderRadius.circular(18),
                       ),
                       child: Column(
                         children: [
-                          const Text('⭐', style: TextStyle(fontSize: 32)),
+                          const Icon(
+                            Icons.star_border_rounded,
+                            size: 34,
+                            color: AppColors.textMuted,
+                          ),
                           const SizedBox(height: 8),
                           Text(
                             'No reviews yet',
                             style: GoogleFonts.poppins(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: kDark,
+                              color: AppColors.textPrimary,
                             ),
                           ),
                           Text(
                             'Be the first to review!',
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: kLuxMuted,
+                              color: AppColors.textMuted,
                             ),
                           ),
                         ],
@@ -379,7 +365,7 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                   else
                     ..._reviews.take(5).map((r) => _ReviewCard(review: r)),
 
-                  const SizedBox(height: 100),
+                  const SizedBox(height: 110),
                 ],
               ),
             ),
@@ -387,15 +373,15 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
         ],
       ),
 
-      // ── Bottom bar ────────────────────────────────────────────
+      // ── Sticky booking CTA ────────────────────────────────────
       bottomNavigationBar: SafeArea(
         child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
           decoration: BoxDecoration(
-            color: kTrueSaffron,
+            color: Colors.white,
             boxShadow: [
               BoxShadow(
-                color: kTrueSaffronDark.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 20,
                 offset: const Offset(0, -4),
               ),
@@ -412,51 +398,36 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                       '₹${tent['base_price']}/night',
                       style: GoogleFonts.poppins(
                         fontSize: 12,
-                        color: Colors.white60,
+                        color: AppColors.textMuted,
                         decoration: TextDecoration.lineThrough,
                       ),
                     ),
                   Text(
                     '₹${tent['price']}',
-                    style: GoogleFonts.playfairDisplay(
+                    style: GoogleFonts.poppins(
                       fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   Text(
                     'per night + taxes',
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      color: Colors.white70,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
               const SizedBox(width: 16),
               Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: kTrueSaffronDark,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    elevation: 0,
-                  ),
+                child: PremiumButton(
+                  label: 'Book Now',
+                  icon: Icons.bolt_rounded,
                   onPressed: () => Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (_) => BookingFormScreen(tent: tent),
-                    ),
-                  ),
-                  child: Text(
-                    'Book Now 🪔',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
                     ),
                   ),
                 ),
@@ -468,13 +439,35 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
     );
   }
 
-  Widget _policyRow(IconData icon, String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
+  Widget _sectionTitle(String text) => Text(
+    text,
+    style: GoogleFonts.poppins(
+      fontSize: 17,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textPrimary,
+    ),
+  );
+
+  Widget _policyRow(IconData icon, String text, {bool isLast = false}) => Padding(
+    padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
     child: Row(
       children: [
-        Icon(icon, color: kTrueSaffron, size: 16),
-        const SizedBox(width: 8),
-        Text(text, style: GoogleFonts.poppins(fontSize: 13, color: kLuxMuted)),
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: AppColors.saffron.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.saffron, size: 15),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          text,
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
+        ),
       ],
     ),
   );
@@ -493,16 +486,16 @@ class _ReviewCard extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: kLuxGoldSoft,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: kTrueSaffron.withOpacity(0.15)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: kTrueSaffron.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -519,20 +512,30 @@ class _ReviewCard extends StatelessWidget {
                     i < rating
                         ? Icons.star_rounded
                         : Icons.star_outline_rounded,
-                    color: kTrueSaffron,
+                    color: AppColors.goldWarm,
                     size: 18,
                   ),
                 ),
               ),
               Text(
                 phone,
-                style: GoogleFonts.poppins(fontSize: 11, color: kLuxMuted),
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
               ),
             ],
           ),
           if (text.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(text, style: GoogleFonts.poppins(fontSize: 13, color: kDark)),
+            Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+                height: 1.5,
+              ),
+            ),
           ],
         ],
       ),
@@ -540,114 +543,75 @@ class _ReviewCard extends StatelessWidget {
   }
 }
 
-// ── Hero image ─────────────────────────────────────────────────
-class _TentHeroImage extends StatelessWidget {
-  final Color color;
-  final dynamic tentClass;
-  final List<Map<String, String>> images;
+// ── Hero gallery: auto-sliding carousel + back/wishlist overlay ──
+class _HeroGallery extends StatelessWidget {
+  final List<String> images;
+  final String tentClass;
+  final String tentId;
 
-  const _TentHeroImage({
-    required this.color,
-    required this.tentClass,
+  const _HeroGallery({
     required this.images,
+    required this.tentClass,
+    required this.tentId,
   });
-
-  Widget _placeholder() => Container(
-    decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: [kTrueSaffronDark, kTrueSaffron],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Text('⛺', style: TextStyle(fontSize: 100)),
-        Text(
-          '$tentClass'.toUpperCase(),
-          style: GoogleFonts.poppins(
-            color: Colors.white70,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 2,
-          ),
-        ),
-      ],
-    ),
-  );
 
   @override
   Widget build(BuildContext context) {
-    if (images.isEmpty) return _placeholder();
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        PageRouteBuilder(
-          opaque: false,
-          barrierColor: Colors.black,
-          transitionDuration: const Duration(milliseconds: 250),
-          pageBuilder: (ctx, anim, _) => FadeTransition(
-            opacity: anim,
-            child: _TentGalleryScreen(images: images, initialIndex: 0),
-          ),
-        ),
-      ),
+      onTap: images.isEmpty
+          ? null
+          : () => Navigator.of(context).push(
+              PageRouteBuilder(
+                opaque: false,
+                barrierColor: Colors.black,
+                transitionDuration: const Duration(milliseconds: 250),
+                pageBuilder: (ctx, anim, secondaryAnim) => FadeTransition(
+                  opacity: anim,
+                  child: _TentGalleryScreen(images: images),
+                ),
+              ),
+            ),
       child: Stack(
-        fit: StackFit.expand,
         children: [
-          buildTentImage(images.first['url']!, placeholder: _placeholder()),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.15),
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.5),
-                  ],
+          TentImageCarousel(images: images, height: 340),
+          Positioned(
+            left: 16,
+            top: 16,
+            child: SafeArea(
+              bottom: false,
+              child: GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.9),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppColors.textPrimary,
+                    size: 18,
+                  ),
                 ),
               ),
             ),
           ),
           Positioned(
-            bottom: 16,
-            left: 16,
-            child: Text(
-              '$tentClass'.toUpperCase(),
-              style: GoogleFonts.poppins(
-                color: Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 2,
-              ),
+            right: 16,
+            top: 16,
+            child: SafeArea(
+              bottom: false,
+              child: WishlistButton(tentId: tentId, size: 20),
             ),
           ),
           Positioned(
-            bottom: 14,
-            right: 14,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.camera_alt, color: Colors.white, size: 13),
-                  const SizedBox(width: 5),
-                  Text(
-                    '${images.length} photos',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+            left: 16,
+            bottom: 16,
+            child: PremiumBadge(
+              label: tentClass.toUpperCase(),
+              style: tentClass == 'premium'
+                  ? PremiumBadgeStyle.gold
+                  : PremiumBadgeStyle.dark,
             ),
           ),
         ],
@@ -656,14 +620,10 @@ class _TentHeroImage extends StatelessWidget {
   }
 }
 
-// ── Gallery screen ─────────────────────────────────────────────
+// ── Full-screen gallery ─────────────────────────────────────────
 class _TentGalleryScreen extends StatefulWidget {
-  final List<Map<String, String>> images;
-  final int initialIndex;
-  const _TentGalleryScreen({
-    required this.images,
-    this.initialIndex = 0,
-  });
+  final List<String> images;
+  const _TentGalleryScreen({required this.images});
 
   @override
   State<_TentGalleryScreen> createState() => _TentGalleryScreenState();
@@ -680,8 +640,7 @@ class _TentGalleryScreenState extends State<_TentGalleryScreen> {
   @override
   void initState() {
     super.initState();
-    _current = widget.initialIndex;
-    _pageController = PageController(initialPage: widget.initialIndex);
+    _pageController = PageController();
     _thumbController = ScrollController();
   }
 
@@ -763,13 +722,13 @@ class _TentGalleryScreenState extends State<_TentGalleryScreen> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(14),
                         child: buildTentImage(
-                          widget.images[i]['url']!,
+                          widget.images[i],
                           fit: BoxFit.contain,
                           placeholder: Container(
-                            color: const Color(0xFF3D2000),
+                            color: const Color(0xFF1A1A1A),
                             child: const Center(
                               child: CircularProgressIndicator(
-                                color: kTrueSaffron,
+                                color: AppColors.saffron,
                               ),
                             ),
                           ),
@@ -821,7 +780,9 @@ class _TentGalleryScreenState extends State<_TentGalleryScreen> {
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(
-                          color: isActive ? kTrueSaffron : Colors.transparent,
+                          color: isActive
+                              ? AppColors.saffron
+                              : Colors.transparent,
                           width: 2.5,
                         ),
                       ),
@@ -829,7 +790,7 @@ class _TentGalleryScreenState extends State<_TentGalleryScreen> {
                         borderRadius: BorderRadius.circular(8),
                         child: Opacity(
                           opacity: isActive ? 1.0 : 0.45,
-                          child: buildTentImage(widget.images[i]['url']!),
+                          child: buildTentImage(widget.images[i]),
                         ),
                       ),
                     ),

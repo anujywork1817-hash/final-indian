@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:kumbh_tent/features/tents/screens/tent_detail_screen.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/features/tents/screens/search_screen.dart';
 import 'package:kumbh_tent/features/kumbh/screens/snan_calendar_screen.dart';
 import 'package:kumbh_tent/core/constants/snan_calendar.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
+import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
+import 'package:kumbh_tent/shared/widgets/wishlist_button.dart';
+import 'package:kumbh_tent/shared/widgets/tent_image_carousel.dart';
+import 'package:kumbh_tent/shared/widgets/shimmer_tent_card.dart';
+import 'package:kumbh_tent/shared/widgets/glass_shine_banner.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 // Tent images live in core/constants/constants.dart as
 // kCapsuleImages / imagesForClass. A second copy used to be
@@ -15,7 +21,7 @@ import 'package:kumbh_tent/core/constants/snan_calendar.dart';
 // importing both this screen and constants.dart was one
 // reference away from an ambiguous-import error.
 
-// ── Helper to load asset or network image ─────────────────────
+// ── Helper to load asset or network image (used elsewhere) ────
 Widget buildTentImage(
   String path, {
   BoxFit fit = BoxFit.cover,
@@ -24,17 +30,20 @@ Widget buildTentImage(
   final fallback =
       placeholder ??
       Container(
-        color: kTrueSaffron.withOpacity(0.1),
+        color: AppColors.saffron.withValues(alpha: 0.08),
         child: const Center(child: Text('⛺', style: TextStyle(fontSize: 60))),
       );
   if (path.startsWith('assets/')) {
-    return Image.asset(path, fit: fit, errorBuilder: (_, __, ___) => fallback);
+    return Image.asset(
+      path,
+      fit: fit,
+      errorBuilder: (context, error, stackTrace) => fallback,
+    );
   }
-  return CachedNetworkImage(
-    imageUrl: path,
+  return Image.network(
+    path,
     fit: fit,
-    placeholder: (_, __) => fallback,
-    errorWidget: (_, __, ___) => fallback,
+    errorBuilder: (context, error, stackTrace) => fallback,
   );
 }
 
@@ -127,262 +136,139 @@ class _BrowseScreenState extends State<BrowseScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
-      body: CustomScrollView(
-        slivers: [
-          // ── AppBar ──────────────────────────────────────────
-          SliverAppBar(
-            expandedHeight: 140,
-            collapsedHeight: 140,
-            pinned: true,
-            floating: false,
-            snap: false,
-            forceElevated: true,
-            backgroundColor: kTrueSaffron,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [kTrueSaffronDark, kTrueSaffron],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Title and the Snan calendar button share a
-                        // row so the button sits in the top-right
-                        // corner, level with the heading.
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Welcome to Simhastha Kumbh Nashik 2027',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Capsule Tent Booking',
-                                    style: GoogleFonts.poppins(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            _calendarButton(),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        // Search bar
-                        GestureDetector(
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const SearchScreen(),
-                            ),
-                          ),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: kLuxGoldSoft,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.search,
-                                  color: kTrueSaffron,
-                                  size: 20,
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'Search tents, location...',
-                                  style: GoogleFonts.poppins(
-                                    color: kLuxMuted,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        bottom: false,
+        child: RefreshIndicator(
+          color: AppColors.saffron,
+          onRefresh: _loadTents,
+          child: CustomScrollView(
+            slivers: [
+              // ── Hero banner: welcome + calendar + search ───────
+              SliverToBoxAdapter(child: _buildHeroBanner()),
 
-          // ── Peak dates banner ───────────────────────────────
-          SliverToBoxAdapter(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kTrueSaffron.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: kTrueSaffron.withOpacity(0.3)),
-              ),
+              // ── Peak pricing ──────────────────────────────────
+              SliverToBoxAdapter(child: _buildPeakPricing()),
+
+              // ── Category chips ────────────────────────────────
+              SliverToBoxAdapter(child: _buildCategoryChips()),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+              // ── Tent list ───────────────────────────────────
+              _buildTentList(),
+
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Hero glass banner: full-width, scrolls with the page ──────
+  Widget _buildHeroBanner() {
+    return GlassShineBanner(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+      child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome to',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        'Simhastha Kumbh Nashik 2027',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Find Your Perfect Stay',
+                        style: GoogleFonts.poppins(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                _calendarButton(),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _searchField(),
+          ],
+      ),
+    );
+  }
+
+  Widget _searchField() {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SearchScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.search_rounded,
+              color: AppColors.saffron,
+              size: 22,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '⚠️ Peak pricing on Amrit Snan dates',
+                    'Where would you like to stay?',
                     style: GoogleFonts.poppins(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: kTrueSaffronDark,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _dateChip('Aug 2', '2x'),
-                        _dateChip('Aug 31', '2.5x'),
-                        _dateChip('Sep 11', '3x'),
-                        _dateChip('Sep 12', '3x'),
-                      ],
+                  Text(
+                    'Nashik • Dates • Guests',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      color: AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-
-          // ── Class filter tabs ───────────────────────────────
-          SliverToBoxAdapter(
-            child: SizedBox(
-              height: 48,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 6,
-                ),
-                itemCount: kCapsuleTentClasses.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final isSel = kCapsuleTentClasses[i]['key'] == _selectedClass;
-                  return GestureDetector(
-                    onTap: () {
-                      setState(
-                        () => _selectedClass = kCapsuleTentClasses[i]['key']!,
-                      );
-                      _loadTents();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isSel ? kTrueSaffron : kLuxGoldSoft,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: isSel
-                              ? kTrueSaffronDark
-                              : kTrueSaffron.withOpacity(0.25),
-                        ),
-                      ),
-                      child: Text(
-                        kCapsuleTentClasses[i]['label']!,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isSel ? Colors.white : kDark,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // ── Tent list ───────────────────────────────────────
-          _isLoading
-              ? SliverFillRemaining(
-                  child: Center(
-                    child: CircularProgressIndicator(color: kTrueSaffron),
-                  ),
-                )
-              : _tents.isEmpty
-              ? SliverFillRemaining(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _loadError != null ? '😕' : '⛺',
-                            style: const TextStyle(fontSize: 44),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _loadError ?? 'No tents in this category',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.poppins(
-                              fontSize: 14,
-                              color: kDark,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: kTrueSaffron,
-                            ),
-                            onPressed: _loadTents,
-                            child: Text(
-                              'Retry',
-                              style: GoogleFonts.poppins(color: Colors.white),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              : SliverPadding(
-                  padding: const EdgeInsets.all(16),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, i) => Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: _CapsuleTentCard(tent: _tents[i]),
-                      ),
-                      childCount: _tents.length,
-                    ),
-                  ),
-                ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// Top-right button into the full 2027 Snan calendar. Carries a
-  /// dot when the next Snan is an Amrit Snan, so the peak days are
-  /// visible without opening the screen.
   Widget _calendarButton() {
     final upcoming = kUpcomingSnans;
     final nextIsAmrit = upcoming.isNotEmpty && upcoming.first.isAmrit;
@@ -392,18 +278,18 @@ class _BrowseScreenState extends State<BrowseScreen> {
         MaterialPageRoute(builder: (_) => const SnanCalendarScreen()),
       ),
       child: Container(
-        padding: const EdgeInsets.all(9),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: kLuxGoldSoft.withOpacity(0.22),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white24),
+          color: AppColors.softSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
         ),
         child: Stack(
           clipBehavior: Clip.none,
           children: [
             const Icon(
               Icons.calendar_month_rounded,
-              color: Colors.white,
+              color: AppColors.textPrimary,
               size: 22,
             ),
             if (nextIsAmrit)
@@ -413,13 +299,66 @@ class _BrowseScreenState extends State<BrowseScreen> {
                 child: Container(
                   width: 8,
                   height: 8,
-                  decoration: BoxDecoration(
-                    color: kLuxGold,
+                  decoration: const BoxDecoration(
+                    color: AppColors.saffron,
                     shape: BoxShape.circle,
-                    border: Border.all(color: kTrueSaffronDark, width: 1),
                   ),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Compact peak pricing card ─────────────────────────────────
+  Widget _buildPeakPricing() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 4),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.goldWarm.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.goldWarm.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text('🔥', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(
+                  'Peak dates',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _dateChip('Aug 2', '2x'),
+                  _dateChip('Aug 31', '2.5x'),
+                  _dateChip('Sep 11', '3x'),
+                  _dateChip('Sep 12', '3x'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Prices increase during high-demand bathing dates.',
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                color: AppColors.textMuted,
+              ),
+            ),
           ],
         ),
       ),
@@ -430,9 +369,9 @@ class _BrowseScreenState extends State<BrowseScreen> {
     margin: const EdgeInsets.only(right: 8),
     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
     decoration: BoxDecoration(
-      color: kLuxGoldSoft,
+      color: Colors.white,
       borderRadius: BorderRadius.circular(10),
-      border: Border.all(color: kTrueSaffron.withOpacity(0.3)),
+      border: Border.all(color: AppColors.border),
     ),
     child: Column(
       mainAxisSize: MainAxisSize.min,
@@ -442,20 +381,142 @@ class _BrowseScreenState extends State<BrowseScreen> {
           style: GoogleFonts.poppins(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: kDark,
+            color: AppColors.textPrimary,
           ),
         ),
         Text(
           surge,
           style: GoogleFonts.poppins(
             fontSize: 11,
-            color: kTrueSaffron,
+            color: AppColors.saffron,
             fontWeight: FontWeight.w600,
           ),
         ),
       ],
     ),
   );
+
+  // ── Category filter chips ─────────────────────────────────────
+  Widget _buildCategoryChips() {
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        itemCount: kCapsuleTentClasses.length,
+        separatorBuilder: (context, i) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final isSel = kCapsuleTentClasses[i]['key'] == _selectedClass;
+          return GestureDetector(
+            onTap: () {
+              setState(() => _selectedClass = kCapsuleTentClasses[i]['key']!);
+              _loadTents();
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              decoration: BoxDecoration(
+                color: isSel ? AppColors.saffron : Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isSel ? AppColors.saffron : AppColors.border,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  kCapsuleTentClasses[i]['label']!,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isSel ? Colors.white : AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // ── Tent list / loading / empty / error states ────────────────
+  Widget _buildTentList() {
+    if (_isLoading) {
+      return SliverPadding(
+        padding: const EdgeInsets.all(20),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) =>
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: SizedBox(height: 320, child: ShimmerTentCard()),
+                ),
+            childCount: 3,
+          ),
+        ),
+      );
+    }
+
+    if (_tents.isEmpty) {
+      return SliverFillRemaining(
+        hasScrollBody: false,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  _loadError != null ? '😕' : '⛺',
+                  style: const TextStyle(fontSize: 44),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  _loadError ?? 'No tents in this category',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: 160,
+                  child: PremiumButton(label: 'Retry', onPressed: _loadTents),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SliverPadding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      sliver: SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, i) => TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: Duration(milliseconds: 300 + (i * 60)),
+            curve: Curves.easeOut,
+            builder: (context, value, child) => Opacity(
+              opacity: value,
+              child: Transform.translate(
+                offset: Offset(0, (1 - value) * 16),
+                child: child,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 20),
+              child: _PremiumTentCard(tent: _tents[i]),
+            ),
+          ),
+          childCount: _tents.length,
+        ),
+      ),
+    );
+  }
 }
 
 // ── Availability Badge ─────────────────────────────────────────
@@ -469,47 +530,35 @@ class _AvailabilityBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color color;
-    String label;
     switch (availability) {
       case 'sold_out':
-        color = Colors.red.shade700;
-        label = '⛔ Sold Out';
-        break;
+        return const PremiumBadge(
+          label: 'SOLD OUT',
+          style: PremiumBadgeStyle.danger,
+        );
       case 'almost_full':
-        color = Colors.red.shade400;
-        label = '🔴 Only $available left!';
-        break;
+        return PremiumBadge(
+          label: 'ONLY $available LEFT',
+          style: PremiumBadgeStyle.danger,
+        );
       case 'limited':
-        color = Colors.orange.shade700;
-        label = '🟡 $available Available';
-        break;
+        return PremiumBadge(
+          label: '$available AVAILABLE',
+          style: PremiumBadgeStyle.gold,
+        );
       default:
-        color = Colors.green.shade600;
-        label = '🟢 Available';
+        return const PremiumBadge(
+          label: 'AVAILABLE',
+          style: PremiumBadgeStyle.success,
+        );
     }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: GoogleFonts.poppins(
-          color: Colors.white,
-          fontSize: 10,
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
   }
 }
 
-// ── Tent Card ──────────────────────────────────────────────────
-class _CapsuleTentCard extends StatelessWidget {
+// ── Premium Tent Card ────────────────────────────────────────────
+class _PremiumTentCard extends StatelessWidget {
   final Map<String, dynamic> tent;
-  const _CapsuleTentCard({required this.tent});
+  const _PremiumTentCard({required this.tent});
 
   String get _classLabel {
     switch (tent['class']) {
@@ -524,27 +573,14 @@ class _CapsuleTentCard extends StatelessWidget {
     }
   }
 
-  Color get _classColor {
-    switch (tent['class']) {
-      case 'standard':
-        return const Color(0xFF0891B2);
-      case 'luxury':
-        return const Color(0xFF059669);
-      case 'premium':
-        return const Color(0xFF7C3AED);
-      default:
-        return kTrueSaffron;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final bool isSurge = tent['is_surge'] == true;
     final images = tent['images'] as List<String>;
-    final firstImage = images.isNotEmpty ? images.first : null;
     final availability = tent['availability'] as String? ?? 'available';
     final available = tent['available'] as int? ?? 100;
     final isSoldOut = availability == 'sold_out';
+    final tentId = tent['id']?.toString() ?? '';
 
     return GestureDetector(
       onTap: isSoldOut
@@ -554,145 +590,56 @@ class _CapsuleTentCard extends StatelessWidget {
               MaterialPageRoute(builder: (_) => TentDetailScreen(tent: tent)),
             ),
       child: Opacity(
-        opacity: isSoldOut ? 0.7 : 1.0,
+        opacity: isSoldOut ? 0.6 : 1.0,
         child: Container(
           decoration: BoxDecoration(
-            color: kLuxGoldSoft,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: kTrueSaffron.withOpacity(0.2), width: 1),
+            border: Border.all(color: AppColors.cardBorder),
             boxShadow: [
               BoxShadow(
-                color: kTrueSaffron.withOpacity(0.07),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: 0.07),
+                blurRadius: 18,
+                offset: const Offset(0, 5),
               ),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Image section ────────────────────────────────
+              // ── Image carousel section ────────────────────────
               Stack(
                 children: [
-                  ClipRRect(
+                  TentImageCarousel(
+                    images: images,
+                    height: 200,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(20),
                     ),
-                    child: SizedBox(
-                      height: 180,
-                      width: double.infinity,
-                      child: firstImage != null
-                          ? buildTentImage(
-                              firstImage,
-                              placeholder: Container(
-                                color: _classColor.withOpacity(0.15),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    color: kTrueSaffron,
-                                  ),
-                                ),
-                              ),
-                            )
-                          : Container(
-                              color: _classColor.withOpacity(0.15),
-                              child: const Center(
-                                child: Text(
-                                  '⛺',
-                                  style: TextStyle(fontSize: 60),
-                                ),
-                              ),
-                            ),
-                    ),
                   ),
-                  // Class badge
                   Positioned(
                     top: 12,
                     left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _classColor,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _classLabel,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                    child: PremiumBadge(
+                      label: _classLabel,
+                      style: tent['class'] == 'premium'
+                          ? PremiumBadgeStyle.gold
+                          : PremiumBadgeStyle.dark,
                     ),
                   ),
-                  // Surge badge
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: WishlistButton(tentId: tentId),
+                  ),
                   if (isSurge)
                     Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade700,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          '🔥 ${tent['surge']} Surge',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  // Availability badge
-                  Positioned(
-                    bottom: 10,
-                    left: 12,
-                    child: _AvailabilityBadge(
-                      availability: availability,
-                      available: available,
-                    ),
-                  ),
-                  // Photos count
-                  if (images.length > 1)
-                    Positioned(
-                      bottom: 10,
-                      right: 12,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.camera_alt,
-                              color: Colors.white,
-                              size: 12,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${images.length} photos',
-                              style: GoogleFonts.poppins(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
+                      bottom: 12,
+                      left: 12,
+                      child: PremiumBadge(
+                        label: '${tent['surge']} SURGE',
+                        style: PremiumBadgeStyle.danger,
+                        icon: Icons.local_fire_department_rounded,
                       ),
                     ),
                 ],
@@ -700,56 +647,45 @@ class _CapsuleTentCard extends StatelessWidget {
 
               // ── Info section ──────────────────────────────────
               Padding(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      tent['name'],
+                      style: GoogleFonts.poppins(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(
-                          child: Text(
-                            tent['name'],
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: kDark,
-                            ),
+                        const Icon(
+                          Icons.star_rounded,
+                          color: AppColors.goldWarm,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${tent['rating']}',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              color: kTrueSaffron,
-                              size: 16,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${tent['rating']}',
-                              style: GoogleFonts.poppins(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: kDark,
-                              ),
-                            ),
-                            Text(
-                              ' (${tent['reviews']})',
-                              style: GoogleFonts.poppins(
-                                fontSize: 11,
-                                color: kLuxMuted,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          ' (${tent['reviews']})  •  ',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
+                        const Icon(
                           Icons.location_on_outlined,
-                          color: kTrueSaffron,
+                          color: AppColors.textMuted,
                           size: 14,
                         ),
                         const SizedBox(width: 2),
@@ -758,46 +694,34 @@ class _CapsuleTentCard extends StatelessWidget {
                             tent['location'],
                             style: GoogleFonts.poppins(
                               fontSize: 12,
-                              color: kLuxMuted,
+                              color: AppColors.textMuted,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _getSizeInfo(),
-                      style: GoogleFonts.poppins(
-                        fontSize: 11,
-                        color: kLuxMuted,
-                      ),
-                    ),
                     const SizedBox(height: 10),
-                    // Amenity chips
                     Wrap(
                       spacing: 6,
-                      runSpacing: 4,
+                      runSpacing: 6,
                       children: (tent['amenities'] as List<String>)
                           .take(4)
                           .map(
                             (a) => Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
+                                horizontal: 10,
+                                vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: kTrueSaffron.withOpacity(0.1),
+                                color: AppColors.softSurface,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: kTrueSaffron.withOpacity(0.2),
-                                ),
                               ),
                               child: Text(
                                 a,
                                 style: GoogleFonts.poppins(
-                                  fontSize: 10,
-                                  color: kTrueSaffronDark,
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -805,8 +729,12 @@ class _CapsuleTentCard extends StatelessWidget {
                           )
                           .toList(),
                     ),
-                    const SizedBox(height: 12),
-                    // Price + Book button
+                    const SizedBox(height: 8),
+                    _AvailabilityBadge(
+                      availability: availability,
+                      available: available,
+                    ),
+                    const SizedBox(height: 14),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -814,53 +742,43 @@ class _CapsuleTentCard extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '₹${tent['price']}/night',
+                              'From',
                               style: GoogleFonts.poppins(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
-                                color: kDark,
+                                fontSize: 11,
+                                color: AppColors.textMuted,
                               ),
                             ),
                             Text(
-                              '+ GST • Nashik Kumbh 2027',
+                              '₹${tent['price']}/night',
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            Text(
+                              '+ GST',
                               style: GoogleFonts.poppins(
                                 fontSize: 10,
-                                color: kLuxMuted,
+                                color: AppColors.textMuted,
                               ),
                             ),
                           ],
                         ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: isSoldOut
-                                ? kLuxMuted
-                                : kTrueSaffron,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 10,
-                            ),
-                            elevation: 0,
-                          ),
-                          onPressed: isSoldOut
-                              ? null
-                              : () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) =>
-                                        TentDetailScreen(tent: tent),
+                        SizedBox(
+                          width: 140,
+                          child: PremiumButton(
+                            label: isSoldOut ? 'Sold Out' : 'View Details',
+                            verticalPadding: 12,
+                            onPressed: isSoldOut
+                                ? null
+                                : () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          TentDetailScreen(tent: tent),
+                                    ),
                                   ),
-                                ),
-                          child: Text(
-                            isSoldOut ? 'Sold Out' : 'Book Now',
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 13,
-                            ),
                           ),
                         ),
                       ],
@@ -873,18 +791,5 @@ class _CapsuleTentCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getSizeInfo() {
-    switch (tent['class']) {
-      case 'standard':
-        return '2.25m × 4.75m × 2.5m • 2 Persons';
-      case 'luxury':
-        return '2.25m × 5.75m × 2.6m • 2-3 Persons';
-      case 'premium':
-        return '2.35m × 6.25m × 2.7m • 2-4 Persons';
-      default:
-        return '';
-    }
   }
 }

@@ -61,7 +61,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
                           shape: BoxShape.circle,
                           color: kTrueSaffronDark,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             width: 1,
                           ),
                         ),
@@ -131,7 +131,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
                         color: kLuxGoldSoft,
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: kTrueSaffron.withOpacity(0.25),
+                          color: kTrueSaffron.withValues(alpha: 0.25),
                           width: 1,
                         ),
                       ),
@@ -145,7 +145,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
                             decoration: BoxDecoration(
                               border: Border(
                                 right: BorderSide(
-                                  color: kTrueSaffron.withOpacity(0.25),
+                                  color: kTrueSaffron.withValues(alpha: 0.25),
                                   width: 1,
                                 ),
                               ),
@@ -249,12 +249,12 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
                         color: kLuxGoldSoft,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: kTrueSaffron.withOpacity(0.25),
+                          color: kTrueSaffron.withValues(alpha: 0.25),
                           width: 1,
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: kTrueSaffron.withOpacity(0.06),
+                            color: kTrueSaffron.withValues(alpha: 0.06),
                             blurRadius: 12,
                             offset: const Offset(0, 3),
                           ),
@@ -301,7 +301,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
   }
 
   Widget _divider() =>
-      Divider(height: 1, thickness: 0.8, color: kTrueSaffron.withOpacity(0.15));
+      Divider(height: 1, thickness: 0.8, color: kTrueSaffron.withValues(alpha: 0.15));
 
   Widget _dateRow(String date, String name, {bool isPeak = false}) {
     return Padding(
@@ -342,9 +342,9 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: kTrueSaffron.withOpacity(0.12),
+                color: kTrueSaffron.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: kTrueSaffron.withOpacity(0.3)),
+                border: Border.all(color: kTrueSaffron.withValues(alpha: 0.3)),
               ),
               child: Text(
                 'PEAK',
@@ -382,6 +382,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
     setState(() => _isLoading = true);
     try {
       final res = await ApiService.sendOTP(_phoneController.text);
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -404,6 +405,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
         ),
       );
     } catch (e) {
+      if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

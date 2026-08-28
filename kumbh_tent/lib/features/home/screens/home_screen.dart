@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/my_bookings_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/profile_screen.dart';
 import 'package:kumbh_tent/features/news/screens/news_screen.dart';
 import 'package:kumbh_tent/features/history/screens/history_screen.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -27,20 +28,72 @@ class _HomeScreenState extends State<HomeScreen> {
     const ProfileScreen(),
   ];
 
+  Future<void> _handleBack() async {
+    // Any tab other than Explore: back always returns to Explore
+    // first, rather than exiting or popping an empty navigator.
+    if (_currentIndex != 0) {
+      setState(() => _currentIndex = 0);
+      return;
+    }
+    final shouldExit = await _confirmExit();
+    if (shouldExit && mounted) SystemNavigator.pop();
+  }
+
+  Future<bool> _confirmExit() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Exit App?',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to exit Kumbh Tent?',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Exit'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBack();
+      },
+      child: Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: kLuxGoldSoft, // warm parchment — matches saffron theme
-          border: Border(
-            top: BorderSide(color: kTrueSaffron.withOpacity(0.15), width: 1),
-          ),
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: kTrueSaffronDark.withOpacity(0.08),
-              blurRadius: 20,
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 16,
               offset: const Offset(0, -4),
             ),
           ],
@@ -60,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -77,14 +131,18 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           decoration: BoxDecoration(
             color: isActive
-                ? kTrueSaffron.withOpacity(0.12)
+                ? AppColors.saffron.withValues(alpha: 0.08)
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, color: isActive ? kTrueSaffron : kLuxMuted, size: 22),
+              Icon(
+                icon,
+                color: isActive ? AppColors.saffron : AppColors.textMuted,
+                size: 22,
+              ),
               const SizedBox(height: 4),
               Text(
                 label,
@@ -92,8 +150,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
                   fontSize: 10.5,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.normal,
-                  color: isActive ? kTrueSaffron : kLuxMuted,
+                  fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                  color: isActive ? AppColors.saffron : AppColors.textMuted,
                 ),
               ),
             ],

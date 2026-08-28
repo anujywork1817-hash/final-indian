@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -12,7 +12,7 @@ import 'package:kumbh_tent/features/auth/screens/splash_screen.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  print('Background message: ${message.messageId}');
+  debugPrint('Background message: ${message.messageId}');
 }
 
 // ── Local notifications plugin ────────────────────────────
@@ -66,7 +66,7 @@ void main() async {
     // Get FCM token and save locally only
     // Will be sent to backend after user logs in
     final token = await FirebaseMessaging.instance.getToken();
-    print('FCM Token: $token');
+    debugPrint('FCM Token: $token');
     if (token != null) {
       await _storage.write(key: 'fcm_token', value: token);
     }

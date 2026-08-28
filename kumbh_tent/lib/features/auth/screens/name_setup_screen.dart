@@ -62,21 +62,23 @@ class _NameSetupScreenState extends State<NameSetupScreen>
       );
       await ApiService.saveNameLocally(name);
       await ApiService.saveGenderPreference(_genderPreference);
-      if (mounted)
+      if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (r) => false,
         );
+      }
     } catch (e) {
       await ApiService.saveNameLocally(name);
       await ApiService.saveGenderPreference(_genderPreference);
-      if (mounted)
+      if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
           (r) => false,
         );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -87,12 +89,13 @@ class _NameSetupScreenState extends State<NameSetupScreen>
         'Pilgrim ${widget.phone.substring(widget.phone.length - 4)}';
     await ApiService.saveNameLocally(defaultName);
     await ApiService.saveGenderPreference('Other');
-    if (mounted)
+    if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
         MaterialPageRoute(builder: (_) => const HomeScreen()),
         (r) => false,
       );
+    }
   }
 
   void _snack(String msg) => ScaffoldMessenger.of(context).showSnackBar(
@@ -130,7 +133,7 @@ class _NameSetupScreenState extends State<NameSetupScreen>
                           shape: BoxShape.circle,
                           color: kTrueSaffronDark,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             width: 1,
                           ),
                         ),
@@ -241,7 +244,7 @@ class _NameSetupScreenState extends State<NameSetupScreen>
                                 border: Border.all(
                                   color: sel
                                       ? kTrueSaffronDark
-                                      : kTrueSaffron.withOpacity(0.25),
+                                      : kTrueSaffron.withValues(alpha: 0.25),
                                   width: sel ? 1.5 : 1,
                                 ),
                               ),
@@ -324,7 +327,7 @@ class _NameSetupScreenState extends State<NameSetupScreen>
                         color: kLuxGoldSoft,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: kTrueSaffron.withOpacity(0.25),
+                          color: kTrueSaffron.withValues(alpha: 0.25),
                           width: 1,
                         ),
                       ),
@@ -391,11 +394,11 @@ class _NameSetupScreenState extends State<NameSetupScreen>
       fillColor: kLuxGoldSoft,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: kTrueSaffron.withOpacity(0.25)),
+        borderSide: BorderSide(color: kTrueSaffron.withValues(alpha: 0.25)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: kTrueSaffron.withOpacity(0.25)),
+        borderSide: BorderSide(color: kTrueSaffron.withValues(alpha: 0.25)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),

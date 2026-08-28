@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class ReviewScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -15,6 +16,17 @@ class _ReviewScreenState extends State<ReviewScreen> {
   int _rating = 0;
   final _reviewController = TextEditingController();
   bool _isSubmitting = false;
+  bool _isSubmitted = false;
+
+  static const _tagOptions = [
+    ('🧼', 'Clean'),
+    ('🙋', 'Friendly staff'),
+    ('📍', 'Great location'),
+    ('💰', 'Value for money'),
+    ('🛏️', 'Comfortable bed'),
+    ('🍽️', 'Good food'),
+  ];
+  final Set<String> _selectedTags = {};
 
   @override
   void dispose() {
@@ -24,7 +36,7 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
   Future<void> _submitReview() async {
     if (_rating == 0) {
-      _snack('Please select a rating', Colors.red);
+      _snack('Please select a rating', AppColors.error);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -35,20 +47,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
                   widget.booking['ref'] ??
                   '')
               .toString();
+      final tags = _selectedTags.isNotEmpty
+          ? '${_selectedTags.map((t) => '#${t.replaceAll(' ', '')}').join(' ')}\n\n'
+          : '';
       await ApiService.submitReview(
         tentId: tentId,
         bookingRef:
             widget.booking['booking_ref'] ?? widget.booking['ref'] ?? '',
         rating: _rating,
-        review: _reviewController.text.trim(),
+        review: '$tags${_reviewController.text.trim()}'.trim(),
       );
       if (mounted) {
-        _snack('Review submitted! Thank you', Colors.green);
-        Navigator.pop(context, true);
+        setState(() {
+          _isSubmitting = false;
+          _isSubmitted = true;
+        });
+        await Future.delayed(const Duration(milliseconds: 900));
+        if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) _snack('Failed to submit review: $e', Colors.red);
-    } finally {
+      if (mounted) _snack('Failed to submit review: $e', AppColors.error);
       if (mounted) setState(() => _isSubmitting = false);
     }
   }
@@ -78,61 +96,79 @@ class _ReviewScreenState extends State<ReviewScreen> {
       case 5:
         return 'Excellent!';
       default:
-        return 'Tap to rate';
+        return 'Tap a star to rate';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: kTrueSaffron,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Colors.white,
-          ),
-          onPressed: () => Navigator.pop(context),
-        ),
         title: Text(
           'Rate Your Stay',
           style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+      body: SafeArea(
+        child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const SizedBox(height: 20),
-
-            // Tent info
+            // ── Tent info ──────────────────────────────────────
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: kLuxGoldSoft,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kTrueSaffron.withOpacity(0.2)),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.cardBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
+                  Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [AppColors.saffron, AppColors.goldWarm],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text('⛺', style: TextStyle(fontSize: 24)),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
                   Text(
                     widget.booking['tent'] ?? widget.booking['tent_name'] ?? '',
-                    style: GoogleFonts.playfairDisplay(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: kDark,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     widget.booking['location'] ?? '',
-                    style: GoogleFonts.poppins(fontSize: 13, color: kLuxMuted),
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
                   ),
                 ],
               ),
@@ -140,57 +176,139 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
             const SizedBox(height: 28),
 
-            // Star rating
+            // ── 3D star rating ───────────────────────────────────
             Text(
               'How was your stay?',
               style: GoogleFonts.poppins(
-                fontSize: 16,
+                fontSize: 17,
                 fontWeight: FontWeight.w600,
-                color: kDark,
+                color: AppColors.textPrimary,
               ),
             ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (i) {
-                final star = i + 1;
-                return GestureDetector(
-                  onTap: () => setState(() => _rating = star),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Icon(
-                      star <= _rating
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
-                      color: star <= _rating ? kTrueSaffron : kLuxBorder,
-                      size: 48,
-                    ),
-                  ),
-                );
-              }),
+            const SizedBox(height: 20),
+            _StarRating(
+              rating: _rating,
+              onChanged: (r) => setState(() => _rating = r),
             ),
-            const SizedBox(height: 8),
-            Text(
-              _ratingLabel,
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: _rating == 0 ? kLuxMuted : kTrueSaffron,
-                fontWeight: FontWeight.w600,
+            const SizedBox(height: 12),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                _ratingLabel,
+                key: ValueKey(_ratingLabel),
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  color: _rating == 0
+                      ? AppColors.textMuted
+                      : AppColors.saffronDark,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
 
             const SizedBox(height: 28),
 
-            // Review text
+            // ── Quick sentiment tags ─────────────────────────────
+            if (_rating > 0) ...[
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'What stood out?',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _tagOptions.map((tag) {
+                  final label = tag.$2;
+                  final selected = _selectedTags.contains(label);
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      if (selected) {
+                        _selectedTags.remove(label);
+                      } else {
+                        _selectedTags.add(label);
+                      }
+                    }),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: selected
+                            ? const LinearGradient(
+                                colors: [
+                                  AppColors.saffron,
+                                  AppColors.saffronDark,
+                                ],
+                              )
+                            : null,
+                        color: selected ? null : Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: selected
+                              ? AppColors.saffron
+                              : AppColors.cardBorder,
+                        ),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.saffron.withValues(
+                                    alpha: 0.3,
+                                  ),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Text(
+                        '${tag.$1} $label',
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 28),
+            ],
+
+            // ── Review text ───────────────────────────────────────
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'Write a review',
+                style: GoogleFonts.poppins(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             Container(
               decoration: BoxDecoration(
-                color: kLuxGoldSoft,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kTrueSaffron.withOpacity(0.2)),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.cardBorder),
                 boxShadow: [
                   BoxShadow(
-                    color: kTrueSaffron.withOpacity(0.06),
-                    blurRadius: 10,
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 14,
                     offset: const Offset(0, 4),
                   ),
                 ],
@@ -199,23 +317,26 @@ class _ReviewScreenState extends State<ReviewScreen> {
                 controller: _reviewController,
                 maxLines: 5,
                 maxLength: 300,
-                style: GoogleFonts.poppins(fontSize: 14, color: kDark),
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                ),
                 decoration: InputDecoration(
                   hintText:
                       'Share your experience... (optional)\n\nHow was the tent? Location? Staff?',
                   hintStyle: GoogleFonts.poppins(
-                    color: kLuxMuted,
+                    color: AppColors.textMuted,
                     fontSize: 13,
                   ),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     borderSide: BorderSide.none,
                   ),
                   filled: true,
-                  fillColor: kLuxGoldSoft,
+                  fillColor: Colors.white,
                   contentPadding: const EdgeInsets.all(16),
                   counterStyle: GoogleFonts.poppins(
-                    color: kLuxMuted,
+                    color: AppColors.textMuted,
                     fontSize: 11,
                   ),
                 ),
@@ -224,37 +345,180 @@ class _ReviewScreenState extends State<ReviewScreen> {
 
             const SizedBox(height: 32),
 
-            // Submit button
+            // ── Submit button ──────────────────────────────────
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: kTrueSaffron,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  elevation: 0,
-                ),
-                onPressed: _isSubmitting ? null : _submitReview,
-                child: _isSubmitting
-                    ? const CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      )
-                    : Text(
-                        'Submit Review',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 250),
+                transitionBuilder: (child, anim) =>
+                    ScaleTransition(scale: anim, child: child),
+                child: _isSubmitted
+                    ? Container(
+                        key: const ValueKey('submitted'),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.success,
+                          borderRadius: BorderRadius.circular(14),
                         ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Thank you!',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    : _isSubmitting
+                    ? Container(
+                        key: const ValueKey('submitting'),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.saffron.withValues(alpha: 0.5),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.2,
+                            ),
+                          ),
+                        ),
+                      )
+                    : PremiumButton(
+                        key: const ValueKey('submit'),
+                        label: 'Submit Review',
+                        icon: Icons.send_rounded,
+                        verticalPadding: 16,
+                        onPressed: _submitReview,
                       ),
               ),
             ),
           ],
         ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Five-star rating control styled like a raised 3D model rather
+/// than a glowing string of lights: each star has a solid gold
+/// face with a small embossed offset shadow for depth, jumps with
+/// a bounce when tapped (staggered across the stars up to the
+/// chosen rating), and shows a little smile badge only once it's
+/// actually selected.
+class _StarRating extends StatefulWidget {
+  final int rating;
+  final ValueChanged<int> onChanged;
+  const _StarRating({required this.rating, required this.onChanged});
+
+  @override
+  State<_StarRating> createState() => _StarRatingState();
+}
+
+class _StarRatingState extends State<_StarRating>
+    with TickerProviderStateMixin {
+  late final List<AnimationController> _controllers = List.generate(
+    5,
+    (_) => AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    ),
+  );
+
+  @override
+  void dispose() {
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _setRating(int rating) {
+    widget.onChanged(rating);
+    for (var i = 0; i < rating; i++) {
+      Future.delayed(Duration(milliseconds: i * 70), () {
+        if (mounted) _controllers[i].forward(from: 0);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(40),
+        border: Border.all(color: AppColors.border, width: 1.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(5, (i) {
+          final star = i + 1;
+          final filled = star <= widget.rating;
+          return GestureDetector(
+            onTap: () => _setRating(star),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: AnimatedBuilder(
+                animation: _controllers[i],
+                builder: (context, child) {
+                  // A quick up-then-down jump — not a scale pop.
+                  final t = _controllers[i].value;
+                  final jump = t == 0
+                      ? 0.0
+                      : -14 * (4 * t * (1 - t)); // parabola, peaks mid-flight
+                  return Transform.translate(
+                    offset: Offset(0, jump),
+                    child: child,
+                  );
+                },
+                child: SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: filled
+                      ? ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Color(0xFFFFE9A8),
+                              AppColors.goldWarm,
+                              Color(0xFFB8860B),
+                            ],
+                            stops: [0.0, 0.55, 1.0],
+                          ).createShader(bounds),
+                          child: const Icon(
+                            Icons.star_rounded,
+                            color: Colors.white,
+                            size: 40,
+                          ),
+                        )
+                      : const Icon(
+                          Icons.star_outline_rounded,
+                          color: AppColors.border,
+                          size: 40,
+                        ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }

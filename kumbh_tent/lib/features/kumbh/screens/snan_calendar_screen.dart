@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/constants/snan_calendar.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
+import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
 
 /// Month-grid calendar of the 2027 Simhastha Snan schedule.
 ///
@@ -31,69 +32,258 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final selected = snanEventsOn(_selectedDay);
+    final upcoming = kUpcomingSnans;
+
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
-      appBar: AppBar(
-        backgroundColor: kTrueSaffron,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
           children: [
-            Text(
-              'Snan Calendar',
-              style: GoogleFonts.poppins(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
+            _header(),
+            if (upcoming.isNotEmpty) _countdownCard(upcoming.first),
+            _calendarCard(),
+            _selectedDayPanel(selected),
+            _legend(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: AppColors.saffron.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(
+                      Icons.event_note_rounded,
+                      size: 16,
+                      color: AppColors.saffron,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'All Snan Dates',
+                    style: GoogleFonts.poppins(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Text(
-              'Simhastha Kumbh Nashik 2027',
-              style: GoogleFonts.poppins(fontSize: 11, color: Colors.white70),
+            ...kSnanEvents.map(_snanTile),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+              child: Text(
+                'Amrit Snan dates are confirmed. Some secondary Parva '
+                'Snans are still listed as provisional by published '
+                'calendars and may shift.',
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                  height: 1.5,
+                ),
+              ),
             ),
           ],
         ),
       ),
-      body: ListView(
-        children: [
-          _calendarCard(),
-          _selectedDayPanel(selected),
-          _legend(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-            child: Text(
-              'All Snan Dates',
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: kLuxDark,
-              ),
-            ),
+    );
+  }
+
+  Widget _header() => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 4, 20, 4),
+    child: Row(
+      children: [
+        IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: AppColors.textPrimary,
+            size: 18,
           ),
-          ...kSnanEvents.map(_snanTile),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, 28),
-            child: Text(
-              'Amrit Snan dates are confirmed. Some secondary Parva '
-              'Snans are still listed as provisional by published '
-              'calendars and may shift.',
-              style: TextStyle(fontSize: 11, color: kLuxMuted, height: 1.5),
-            ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Snan Calendar',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                'Simhastha Kumbh Nashik 2027',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+
+  Widget _countdownCard(SnanEvent next) {
+    final days = snanDaysUntil(next.date);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.saffron, AppColors.saffronDark],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.saffron.withValues(alpha: 0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -30,
+              top: -30,
+              child: Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.water_drop_rounded,
+                            color: Colors.white70,
+                            size: 12,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'NEXT SNAN',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white70,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        next.name,
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        snanLongDate(next.date),
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      if (next.isAmrit) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '★ Amrit Snan',
+                            style: GoogleFonts.poppins(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        '$days',
+                        style: GoogleFonts.poppins(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'days',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _calendarCard() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      margin: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kTrueSaffron.withOpacity(0.18)),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: TableCalendar<SnanEvent>(
         firstDay: kSnanFirstDay,
@@ -118,34 +308,70 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
           formatButtonVisible: false,
           titleTextStyle: GoogleFonts.poppins(
             fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: kLuxDark,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
-          leftChevronIcon: const Icon(Icons.chevron_left, color: kTrueSaffron),
-          rightChevronIcon: const Icon(Icons.chevron_right, color: kTrueSaffron),
+          leftChevronIcon: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.softSurface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.chevron_left_rounded,
+              color: AppColors.saffron,
+              size: 20,
+            ),
+          ),
+          rightChevronIcon: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.softSurface,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.saffron,
+              size: 20,
+            ),
+          ),
         ),
         daysOfWeekStyle: DaysOfWeekStyle(
-          weekdayStyle: GoogleFonts.poppins(fontSize: 11, color: kLuxMuted),
+          weekdayStyle: GoogleFonts.poppins(
+            fontSize: 11,
+            color: AppColors.textMuted,
+          ),
           weekendStyle: GoogleFonts.poppins(
             fontSize: 11,
-            color: kTrueSaffronDark,
+            color: AppColors.saffronDark,
           ),
         ),
         calendarStyle: CalendarStyle(
           outsideDaysVisible: false,
           todayDecoration: BoxDecoration(
-            color: kTrueSaffron.withOpacity(0.22),
+            color: AppColors.saffron.withValues(alpha: 0.12),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: AppColors.saffron.withValues(alpha: 0.5),
+            ),
           ),
-          todayTextStyle: const TextStyle(color: kLuxDark),
+          todayTextStyle: const TextStyle(
+            color: AppColors.saffronDark,
+            fontWeight: FontWeight.w600,
+          ),
           selectedDecoration: const BoxDecoration(
-            color: kTrueSaffron,
+            gradient: LinearGradient(
+              colors: [AppColors.saffron, AppColors.saffronDark],
+            ),
             shape: BoxShape.circle,
           ),
-          defaultTextStyle: GoogleFonts.poppins(fontSize: 13, color: kLuxDark),
+          defaultTextStyle: GoogleFonts.poppins(
+            fontSize: 13,
+            color: AppColors.textPrimary,
+          ),
           weekendTextStyle: GoogleFonts.poppins(
             fontSize: 13,
-            color: kTrueSaffronDark,
+            color: AppColors.saffronDark,
           ),
         ),
         calendarBuilders: CalendarBuilders<SnanEvent>(
@@ -160,7 +386,12 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
               width: isAmrit ? 7 : 5,
               height: isAmrit ? 7 : 5,
               decoration: BoxDecoration(
-                color: isAmrit ? kTrueSaffronDark : kTrueSaffron,
+                gradient: isAmrit
+                    ? const LinearGradient(
+                        colors: [AppColors.saffron, AppColors.goldWarm],
+                      )
+                    : null,
+                color: isAmrit ? null : AppColors.saffron,
                 shape: BoxShape.circle,
               ),
             );
@@ -173,15 +404,17 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
   Widget _selectedDayPanel(List<SnanEvent> events) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: events.isEmpty ? Colors.white : kTrueSaffron.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(16),
+        color: events.isEmpty
+            ? AppColors.softSurface
+            : AppColors.goldWarm.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: events.isEmpty
-              ? kLuxBorder
-              : kTrueSaffron.withOpacity(0.35),
+              ? AppColors.border
+              : AppColors.goldWarm.withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -192,14 +425,17 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
             style: GoogleFonts.poppins(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: kLuxMuted,
+              color: AppColors.textMuted,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           if (events.isEmpty)
             Text(
               'No Snan on this day.',
-              style: GoogleFonts.poppins(fontSize: 13, color: kLuxMuted),
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                color: AppColors.textMuted,
+              ),
             )
           else
             ...events.map(
@@ -212,31 +448,35 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
                         child: Text(
                           e.name,
                           style: GoogleFonts.poppins(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w700,
                             color: e.color,
                           ),
                         ),
                       ),
-                      if (e.surge != null) _surgePill(e.surge!),
+                      if (e.surge != null)
+                        PremiumBadge(
+                          label: '${e.surge} pricing',
+                          style: PremiumBadgeStyle.saffron,
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Text(
                     e.significance,
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: kLuxDark,
+                      color: AppColors.textPrimary,
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(
                         Icons.place_outlined,
                         size: 14,
-                        color: kLuxMuted,
+                        color: AppColors.textMuted,
                       ),
                       const SizedBox(width: 4),
                       Expanded(
@@ -244,7 +484,7 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
                           e.location,
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: kLuxMuted,
+                            color: AppColors.textMuted,
                           ),
                         ),
                       ),
@@ -266,25 +506,44 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
         _focusedDay = e.date;
       }),
       child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        padding: const EdgeInsets.all(12),
+        margin: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: e.isAmrit ? kTrueSaffron.withOpacity(0.45) : kLuxBorder,
+            color: e.isAmrit
+                ? AppColors.goldWarm.withValues(alpha: 0.5)
+                : AppColors.cardBorder,
             width: e.isAmrit ? 1.4 : 1,
           ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(
+                alpha: e.isAmrit ? 0.08 : 0.05,
+              ),
+              blurRadius: e.isAmrit ? 16 : 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 52,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              width: 56,
+              padding: const EdgeInsets.symmetric(vertical: 8),
               decoration: BoxDecoration(
-                color: e.color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
+                gradient: e.isAmrit
+                    ? LinearGradient(
+                        colors: [
+                          e.color.withValues(alpha: 0.9),
+                          AppColors.goldWarm,
+                        ],
+                      )
+                    : null,
+                color: e.isAmrit ? null : e.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
@@ -293,20 +552,22 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
                     style: GoogleFonts.poppins(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: e.color,
+                      color: e.isAmrit ? Colors.white : e.color,
                     ),
                   ),
                   Text(
                     snanShortDate(e.date).split(' ').first,
                     style: GoogleFonts.poppins(
                       fontSize: 10,
-                      color: kLuxMuted,
+                      color: e.isAmrit
+                          ? Colors.white70
+                          : AppColors.textMuted,
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -314,38 +575,49 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
                   Text(
                     e.name,
                     style: GoogleFonts.poppins(
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: kLuxDark,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     e.location,
                     style: GoogleFonts.poppins(
                       fontSize: 11,
-                      color: kLuxMuted,
+                      color: AppColors.textMuted,
                     ),
                   ),
                   if (e.isAmrit)
                     Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        '★ Amrit Snan',
-                        style: GoogleFonts.poppins(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: kTrueSaffronDark,
-                        ),
+                      padding: const EdgeInsets.only(top: 6),
+                      child: PremiumBadge(
+                        label: 'AMRIT SNAN',
+                        style: PremiumBadgeStyle.gold,
+                        icon: Icons.star_rounded,
                       ),
                     ),
                 ],
               ),
             ),
             if (days >= 0)
-              Text(
-                days == 0 ? 'Today' : 'in ${days}d',
-                style: GoogleFonts.poppins(fontSize: 10, color: kLuxMuted),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.softSurface,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  days == 0 ? 'Today' : 'in ${days}d',
+                  style: GoogleFonts.poppins(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
               ),
           ],
         ),
@@ -353,44 +625,29 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
     );
   }
 
-  Widget _surgePill(String surge) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-    decoration: BoxDecoration(
-      color: kTrueSaffronDark,
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      '$surge pricing',
-      style: GoogleFonts.poppins(
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        color: Colors.white,
-      ),
-    ),
-  );
-
   Widget _legend() => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+    padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
     child: Row(
       children: [
-        _legendDot(kTrueSaffronDark, 7, 'Amrit / Shahi Snan'),
-        const SizedBox(width: 16),
-        _legendDot(kTrueSaffron, 5, 'Parva Snan'),
+        _legendDot(AppColors.goldWarm, 'Amrit / Shahi Snan'),
+        const SizedBox(width: 20),
+        _legendDot(AppColors.saffron, 'Parva Snan'),
       ],
     ),
   );
 
-  Widget _legendDot(Color c, double size, String label) => Row(
+  Widget _legendDot(Color c, String label) => Row(
+    mainAxisSize: MainAxisSize.min,
     children: [
       Container(
-        width: size,
-        height: size,
+        width: 8,
+        height: 8,
         decoration: BoxDecoration(color: c, shape: BoxShape.circle),
       ),
       const SizedBox(width: 6),
       Text(
         label,
-        style: GoogleFonts.poppins(fontSize: 11, color: kLuxMuted),
+        style: GoogleFonts.poppins(fontSize: 11, color: AppColors.textMuted),
       ),
     ],
   );

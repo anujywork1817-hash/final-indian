@@ -1,66 +1,68 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
+import 'app_colors.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: ColorScheme.fromSeed(
-        seedColor: kSaffron,
-        primary: kSaffron,
-        secondary: kGold,
-        surface: kCream,
-        error: Colors.red.shade700,
+        seedColor: AppColors.saffron,
+        brightness: Brightness.light,
+        primary: AppColors.saffron,
+        secondary: AppColors.gold,
+        surface: AppColors.surface,
+        error: AppColors.error,
       ),
 
-      // Text theme
       textTheme: GoogleFonts.poppinsTextTheme(),
 
-      // Scaffold
-      scaffoldBackgroundColor: kCream,
+      // ── Backgrounds: white is dominant ─────────────────────
+      scaffoldBackgroundColor: AppColors.background,
+      canvasColor: AppColors.background,
 
       // AppBar
       appBarTheme: AppBarTheme(
-        backgroundColor: kDeepOrange,
-        foregroundColor: Colors.white,
+        backgroundColor: AppColors.background,
+        foregroundColor: AppColors.textPrimary,
         elevation: 0,
         centerTitle: false,
+        surfaceTintColor: Colors.transparent,
         systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
+          statusBarIconBrightness: Brightness.dark,
         ),
         titleTextStyle: GoogleFonts.poppins(
-          color: Colors.white,
+          color: AppColors.textPrimary,
           fontSize: 18,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
 
-      // ElevatedButton
+      // ElevatedButton — primary saffron CTA
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: kSaffron,
+          backgroundColor: AppColors.saffron,
           foregroundColor: Colors.white,
+          disabledBackgroundColor: AppColors.textMuted,
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           textStyle: GoogleFonts.poppins(
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w600,
             fontSize: 15,
           ),
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 24),
         ),
       ),
 
-      // OutlinedButton
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: kSaffron,
-          side: const BorderSide(color: kSaffron),
+          foregroundColor: AppColors.saffron,
+          side: const BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -71,10 +73,9 @@ class AppTheme {
         ),
       ),
 
-      // TextButton
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: kSaffron,
+          foregroundColor: AppColors.saffron,
           textStyle: GoogleFonts.poppins(
             fontWeight: FontWeight.w600,
             fontSize: 13,
@@ -85,7 +86,7 @@ class AppTheme {
       // Input / TextField
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.softSurface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 14,
@@ -96,91 +97,89 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.grey.shade200),
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: kSaffron, width: 2),
+          borderSide: const BorderSide(color: AppColors.saffron, width: 2),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: Colors.red.shade400),
+          borderSide: const BorderSide(color: AppColors.error),
         ),
         hintStyle: GoogleFonts.poppins(
-          color: Colors.grey.shade400,
+          color: AppColors.textMuted,
           fontSize: 14,
         ),
       ),
 
-      // Card
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: AppColors.surface,
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        shadowColor: Colors.black.withAlpha(10),
+        shadowColor: Colors.black.withValues(alpha: 0.04),
       ),
 
-      // Chip
       chipTheme: ChipThemeData(
-        backgroundColor: Colors.white,
-        selectedColor: kSaffron,
+        backgroundColor: AppColors.softSurface,
+        selectedColor: AppColors.saffron,
         labelStyle: GoogleFonts.poppins(
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: const BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       ),
 
-      // TabBar
       tabBarTheme: TabBarThemeData(
-        indicatorColor: Colors.white,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white60,
-        labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w700),
+        indicatorColor: AppColors.saffron,
+        labelColor: AppColors.saffron,
+        unselectedLabelColor: AppColors.textMuted,
+        labelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         unselectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w500),
       ),
 
-      // BottomNavigationBar
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
-        selectedItemColor: kSaffron,
-        unselectedItemColor: Colors.grey,
+        backgroundColor: AppColors.background,
+        selectedItemColor: AppColors.saffron,
+        unselectedItemColor: AppColors.textMuted,
         selectedLabelStyle: GoogleFonts.poppins(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           fontSize: 11,
         ),
         unselectedLabelStyle: GoogleFonts.poppins(fontSize: 11),
-        elevation: 20,
+        elevation: 8,
         type: BottomNavigationBarType.fixed,
       ),
 
-      // Divider
-      dividerTheme: DividerThemeData(
-        color: Colors.grey.shade100,
+      dividerTheme: const DividerThemeData(
+        color: AppColors.border,
         thickness: 1,
         space: 1,
       ),
 
-      // SnackBar
       snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.textPrimary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        contentTextStyle: GoogleFonts.poppins(fontSize: 13),
+        contentTextStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          color: Colors.white,
+        ),
       ),
 
-      // Dialog
       dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         titleTextStyle: GoogleFonts.poppins(
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w600,
           fontSize: 16,
-          color: kDark,
+          color: AppColors.textPrimary,
         ),
         contentTextStyle: GoogleFonts.poppins(
           fontSize: 13,
-          color: Colors.grey.shade700,
+          color: AppColors.textSecondary,
         ),
       ),
     );

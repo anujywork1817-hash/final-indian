@@ -5,8 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/booking/screens/e_ticket_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/review_screen.dart';
+import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
+import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
+import 'package:kumbh_tent/shared/widgets/shimmer_tent_card.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
@@ -64,7 +69,7 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       }
     } catch (e) {
       setState(() {
-        _error = e.toString();
+        _error = 'Something went wrong loading your bookings';
         _loading = false;
       });
     }
@@ -94,13 +99,13 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: kLuxGoldSoft,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Cancel Booking',
-          style: GoogleFonts.playfairDisplay(
-            color: kDark,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.poppins(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
         content: Column(
@@ -109,7 +114,10 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
           children: [
             Text(
               'Are you sure you want to cancel this booking?',
-              style: GoogleFonts.poppins(color: kLuxMuted, fontSize: 14),
+              style: GoogleFonts.poppins(
+                color: AppColors.textSecondary,
+                fontSize: 14,
+              ),
             ),
             if (quoteMessage != null) ...[
               const SizedBox(height: 12),
@@ -163,19 +171,12 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
             child: Text(
               'No',
               style: GoogleFonts.poppins(
-                color: kTrueSaffron,
+                color: AppColors.saffron,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kTrueSaffron,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Yes, Cancel',
@@ -206,17 +207,17 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
       if (res.statusCode == 200) {
         _snack(
           (body['message'] as String?) ?? 'Booking cancelled',
-          Colors.green,
+          AppColors.success,
         );
       } else {
         _snack(
           (body['error'] as String?) ?? 'Could not cancel booking',
-          Colors.red,
+          AppColors.error,
         );
       }
       _load();
     } catch (e) {
-      if (mounted) _snack('Could not cancel booking', Colors.red);
+      if (mounted) _snack('Could not cancel booking', AppColors.error);
     }
   }
 
@@ -237,31 +238,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: kLuxGoldSoft,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Remove Booking?',
-          style: GoogleFonts.playfairDisplay(
-            color: kDark,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.poppins(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Remove this booking from your list?',
-          style: GoogleFonts.poppins(color: kLuxMuted, fontSize: 14),
+          style: GoogleFonts.poppins(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No', style: GoogleFonts.poppins(color: kTrueSaffron)),
+            child: Text(
+              'No',
+              style: GoogleFonts.poppins(color: AppColors.saffron),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Remove',
@@ -298,31 +300,32 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: kLuxGoldSoft,
+        backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Clear All Cancelled?',
-          style: GoogleFonts.playfairDisplay(
-            color: kDark,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.poppins(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'Remove all ${cancelled.length} cancelled booking(s)?',
-          style: GoogleFonts.poppins(color: kLuxMuted, fontSize: 14),
+          style: GoogleFonts.poppins(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No', style: GoogleFonts.poppins(color: kTrueSaffron)),
+            child: Text(
+              'No',
+              style: GoogleFonts.poppins(color: AppColors.saffron),
+            ),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: Text(
               'Clear All',
@@ -366,80 +369,151 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: kTrueSaffron,
-        elevation: 0,
         automaticallyImplyLeading: false,
         title: Text(
           'My Bookings',
-          style: GoogleFonts.playfairDisplay(
-            color: Colors.white,
-            fontWeight: FontWeight.w700,
+          style: GoogleFonts.poppins(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w600,
             fontSize: 20,
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: _load,
           ),
           if (_hasCancelled)
             IconButton(
-              icon: const Icon(
-                Icons.delete_sweep_outlined,
-                color: Colors.white,
-              ),
+              icon: const Icon(Icons.delete_sweep_outlined),
               onPressed: _clearAll,
               tooltip: 'Clear All Cancelled',
             ),
         ],
-        bottom: TabBar(
-          controller: _tab,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelStyle: GoogleFonts.poppins(
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
-          ),
-          unselectedLabelStyle: GoogleFonts.poppins(
-            fontWeight: FontWeight.w500,
-            fontSize: 13,
-          ),
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white60,
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Active'),
-            Tab(text: 'Completed'),
-          ],
-        ),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: kTrueSaffron))
-          : _error != null
-          ? _empty(_error!)
-          : TabBarView(
-              controller: _tab,
-              children: [_list('all'), _list('confirmed'), _list('completed')],
+      body: Column(
+        children: [
+          _segmentedTabs(),
+          Expanded(
+            child: _loading
+                ? ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: 3,
+                    itemBuilder: (context, i) => const Padding(
+                      padding: EdgeInsets.only(bottom: 16),
+                      child: SizedBox(height: 260, child: ShimmerTentCard()),
+                    ),
+                  )
+                : _error != null
+                ? _errorState(_error!)
+                : TabBarView(
+                    controller: _tab,
+                    children: [
+                      _list('all'),
+                      _list('confirmed'),
+                      _list('completed'),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static const _tabLabels = ['All', 'Active', 'Completed'];
+
+  Widget _segmentedTabs() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: AnimatedBuilder(
+        animation: _tab.animation ?? _tab,
+        builder: (context, _) {
+          final position =
+              _tab.animation?.value ?? _tab.index.toDouble();
+          return Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.softSurface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
             ),
+            child: Stack(
+              children: [
+                AnimatedAlign(
+                  duration: const Duration(milliseconds: 120),
+                  curve: Curves.easeOut,
+                  alignment: Alignment(
+                    -1 + (position.clamp(0, 2) / 1),
+                    0,
+                  ),
+                  child: FractionallySizedBox(
+                    widthFactor: 1 / _tabLabels.length,
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(11),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: List.generate(_tabLabels.length, (i) {
+                    final selected = _tab.index == i;
+                    return Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _tab.animateTo(i),
+                        child: SizedBox(
+                          height: 36,
+                          child: Center(
+                            child: Text(
+                              _tabLabels[i],
+                              style: GoogleFonts.poppins(
+                                fontSize: 13,
+                                fontWeight: selected
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                                color: selected
+                                    ? AppColors.saffron
+                                    : AppColors.textMuted,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 
   Widget _list(String filter) {
     final items = _filtered(filter);
-    if (items.isEmpty)
-      return _empty('No ${filter == 'all' ? '' : filter} bookings yet');
+    if (items.isEmpty) return _emptyState();
     return RefreshIndicator(
-      color: kTrueSaffron,
+      color: AppColors.saffron,
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: items.length,
-        itemBuilder: (_, i) {
+        itemBuilder: (context, i) {
           final ref =
               (items[i]['booking_ref'] ?? items[i]['id'])?.toString() ?? '';
-          final status = (items[i]['status'] ?? '').toString().toLowerCase();
           return _BookingCard(
             booking: items[i],
             onCancel: () => _cancel(ref),
@@ -494,18 +568,91 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     );
   }
 
-  Widget _empty(String msg) => Center(
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(
-          Icons.holiday_village_outlined,
-          size: 64,
-          color: kTrueSaffron.withOpacity(0.3),
-        ),
-        const SizedBox(height: 12),
-        Text(msg, style: GoogleFonts.poppins(color: kLuxMuted, fontSize: 15)),
-      ],
+  Widget _emptyState() => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeInOut,
+            builder: (context, value, child) => Transform.translate(
+              offset: Offset(0, -6 * (0.5 - (value - 0.5).abs()) * 2),
+              child: child,
+            ),
+            child: const Text('🏕️', style: TextStyle(fontSize: 64)),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'No stays booked yet',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Your next memorable Kumbh experience\nis waiting for you.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              color: AppColors.textMuted,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: 200,
+            child: PremiumButton(
+              label: 'Explore Tents',
+              icon: Icons.explore_rounded,
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BrowseScreen()),
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Widget _errorState(String msg) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline_rounded,
+            size: 48,
+            color: AppColors.textMuted,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Something went wrong',
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            msg,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.poppins(fontSize: 13, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: 160,
+            child: PremiumButton(label: 'Try Again', onPressed: _load),
+          ),
+        ],
+      ),
     ),
   );
 
@@ -544,33 +691,31 @@ class _BookingCard extends StatelessWidget {
   String get _status =>
       (booking['status'] ?? 'pending').toString().toLowerCase();
 
-  Color get _badgeText {
+  PremiumBadgeStyle get _badgeStyle {
     switch (_status) {
       case 'confirmed':
-        return const Color(0xFF2E6B35);
+        return PremiumBadgeStyle.success;
       case 'cancelled':
-        return const Color(0xFF8B1A1A);
+        return PremiumBadgeStyle.danger;
       case 'pending':
-        return const Color(0xFF7A4500);
+        return PremiumBadgeStyle.gold;
       case 'no_show':
-        return Colors.white;
+        return PremiumBadgeStyle.dark;
       default:
-        return kLuxMuted;
+        return PremiumBadgeStyle.dark;
     }
   }
 
-  Color get _badgeBg {
+  Color get _accentColor {
     switch (_status) {
       case 'confirmed':
-        return const Color(0xFFDFF5E3);
+        return AppColors.success;
       case 'cancelled':
-        return const Color(0xFFF5E0E0);
+        return AppColors.error;
       case 'pending':
-        return const Color(0xFFFFF0D9);
-      case 'no_show':
-        return const Color(0xFF2B2B2B);
+        return AppColors.goldWarm;
       default:
-        return kLuxGoldSoft;
+        return AppColors.textMuted;
     }
   }
 
@@ -588,41 +733,65 @@ class _BookingCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: kLuxGoldSoft,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: kLuxBorder, width: 1.2),
+        border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: kTrueSaffron.withOpacity(0.08),
-            blurRadius: 14,
+            color: Colors.black.withValues(alpha: 0.07),
+            blurRadius: 16,
             offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(width: 4, color: _accentColor),
+            Expanded(child: _cardBody(tentName, location, checkIn, checkOut, ref, total, cancelled, noShow)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _cardBody(
+    dynamic tentName,
+    dynamic location,
+    String checkIn,
+    String checkOut,
+    dynamic ref,
+    dynamic total,
+    bool cancelled,
+    bool noShow,
+  ) {
+    return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
-          Container(
+          Padding(
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: kTrueSaffron.withOpacity(0.12),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(17),
-              ),
-            ),
             child: Row(
               children: [
                 Container(
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: kTrueSaffron.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        AppColors.saffron.withValues(alpha: 0.15),
+                        AppColors.goldWarm.withValues(alpha: 0.15),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
                     Icons.holiday_village_rounded,
-                    color: kTrueSaffron,
+                    color: AppColors.saffron,
                     size: 24,
                   ),
                 ),
@@ -633,10 +802,10 @@ class _BookingCard extends StatelessWidget {
                     children: [
                       Text(
                         tentName,
-                        style: GoogleFonts.playfairDisplay(
+                        style: GoogleFonts.poppins(
                           fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: kDark,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                       if (location.isNotEmpty)
@@ -644,34 +813,20 @@ class _BookingCard extends StatelessWidget {
                           location,
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: kLuxMuted,
+                            color: AppColors.textMuted,
                           ),
                         ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _badgeBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _status.toUpperCase(),
-                    style: GoogleFonts.poppins(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      color: _badgeText,
-                      letterSpacing: 0.6,
-                    ),
-                  ),
+                PremiumBadge(
+                  label: _status.toUpperCase(),
+                  style: _badgeStyle,
                 ),
               ],
             ),
           ),
+          const Divider(height: 1, color: AppColors.border),
 
           // Dates
           Padding(
@@ -683,9 +838,9 @@ class _BookingCard extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-            child: Divider(color: kLuxBorder, thickness: 1),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Divider(color: AppColors.border, thickness: 1),
           ),
 
           // Ref + Total
@@ -698,10 +853,10 @@ class _BookingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Booking ref',
+                        'Booking ID',
                         style: GoogleFonts.poppins(
                           fontSize: 10,
-                          color: kLuxMuted,
+                          color: AppColors.textMuted,
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -709,8 +864,8 @@ class _BookingCard extends StatelessWidget {
                         ref.toString(),
                         style: GoogleFonts.poppins(
                           fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: kDark,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
@@ -723,16 +878,16 @@ class _BookingCard extends StatelessWidget {
                       'Total paid',
                       style: GoogleFonts.poppins(
                         fontSize: 10,
-                        color: kLuxMuted,
+                        color: AppColors.textMuted,
                         letterSpacing: 0.5,
                       ),
                     ),
                     Text(
                       '₹${total.toString()}',
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: kTrueSaffron,
+                      style: GoogleFonts.poppins(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.saffronDark,
                       ),
                     ),
                   ],
@@ -753,9 +908,9 @@ class _BookingCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF2F2F2),
+                  color: AppColors.softSurface,
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFDADADA)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -763,7 +918,7 @@ class _BookingCard extends StatelessWidget {
                     const Icon(
                       Icons.event_busy,
                       size: 16,
-                      color: Color(0xFF2B2B2B),
+                      color: AppColors.textSecondary,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -772,7 +927,7 @@ class _BookingCard extends StatelessWidget {
                             'This booking was marked as a no-show — check-in was not recorded before the cutoff.',
                         style: GoogleFonts.poppins(
                           fontSize: 11,
-                          color: const Color(0xFF2B2B2B),
+                          color: AppColors.textSecondary,
                         ),
                       ),
                     ),
@@ -792,22 +947,10 @@ class _BookingCard extends StatelessWidget {
                       child: OutlinedButton(
                         onPressed: onTicket,
                         style: OutlinedButton.styleFrom(
-                          foregroundColor: kDark,
-                          side: BorderSide(color: kLuxBorder, width: 1.2),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                          foregroundColor: AppColors.textPrimary,
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          backgroundColor: kLuxCream,
                         ),
-                        child: Text(
-                          'E-Ticket',
-                          style: GoogleFonts.poppins(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: kDark,
-                          ),
-                        ),
+                        child: const Text('E-Ticket'),
                       ),
                     ),
                     if (!noShow) ...[
@@ -816,28 +959,13 @@ class _BookingCard extends StatelessWidget {
                         child: OutlinedButton(
                           onPressed: cancelled ? onClear : onCancel,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: cancelled
-                                ? Colors.red
-                                : const Color(0xFF8B1A1A),
+                            foregroundColor: AppColors.error,
                             side: BorderSide(
-                              color: cancelled
-                                  ? Colors.red.shade300
-                                  : const Color(0xFFD4AAAA),
-                              width: 1.2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                              color: AppColors.error.withValues(alpha: 0.4),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 12),
-                            backgroundColor: kLuxCream,
                           ),
-                          child: Text(
-                            cancelled ? 'Clear' : 'Cancel',
-                            style: GoogleFonts.poppins(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
+                          child: Text(cancelled ? 'Clear' : 'Cancel'),
                         ),
                       ),
                     ],
@@ -845,35 +973,18 @@ class _BookingCard extends StatelessWidget {
                 ),
                 if (!cancelled && !noShow) ...[
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: onReview,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: kTrueSaffron,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                      ),
-                      child: Text(
-                        'Rate & review your stay',
-                        style: GoogleFonts.poppins(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
+                  PremiumButton(
+                    label: 'Rate & review your stay',
+                    icon: Icons.star_rounded,
+                    onPressed: onReview,
+                    verticalPadding: 12,
                   ),
                 ],
               ],
             ),
           ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _col(String label, String value, {bool end = false}) => Column(
@@ -883,7 +994,7 @@ class _BookingCard extends StatelessWidget {
         label,
         style: GoogleFonts.poppins(
           fontSize: 10,
-          color: kLuxMuted,
+          color: AppColors.textMuted,
           letterSpacing: 0.5,
         ),
       ),
@@ -892,8 +1003,8 @@ class _BookingCard extends StatelessWidget {
         value,
         style: GoogleFonts.poppins(
           fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: kDark,
+          fontWeight: FontWeight.w600,
+          color: AppColors.textPrimary,
         ),
       ),
     ],

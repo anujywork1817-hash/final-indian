@@ -229,7 +229,6 @@ class _CouponCard extends StatelessWidget {
   final VoidCallback onApply;
 
   const _CouponCard({
-    super.key,
     required this.coupon,
     required this.color,
     required this.discountLabel,

@@ -46,8 +46,12 @@ class _OTPScreenState extends State<OTPScreen>
   void dispose() {
     _timer?.cancel();
     _fadeCtrl.dispose();
-    for (final c in _controllers) c.dispose();
-    for (final f in _focusNodes) f.dispose();
+    for (final c in _controllers) {
+      c.dispose();
+    }
+    for (final f in _focusNodes) {
+      f.dispose();
+    }
     super.dispose();
   }
 
@@ -60,10 +64,11 @@ class _OTPScreenState extends State<OTPScreen>
         return;
       }
       setState(() {
-        if (_resendSeconds > 0)
+        if (_resendSeconds > 0) {
           _resendSeconds--;
-        else
+        } else {
           t.cancel();
+        }
       });
     });
   }
@@ -74,7 +79,9 @@ class _OTPScreenState extends State<OTPScreen>
       final res = await ApiService.sendOTP(widget.phone);
       if (mounted) {
         _snack('OTP: ${res['otp']}', kTrueSaffronDark);
-        for (final c in _controllers) c.clear();
+        for (final c in _controllers) {
+          c.clear();
+        }
         _focusNodes[0].requestFocus();
         _startTimer();
       }
@@ -125,7 +132,7 @@ class _OTPScreenState extends State<OTPScreen>
                           shape: BoxShape.circle,
                           color: kTrueSaffronDark,
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.4),
+                            color: Colors.white.withValues(alpha: 0.4),
                             width: 1,
                           ),
                         ),
@@ -330,7 +337,7 @@ class _OTPScreenState extends State<OTPScreen>
         decoration: InputDecoration(
           counterText: '',
           filled: true,
-          fillColor: filled ? kTrueSaffron.withOpacity(0.1) : kLuxGoldSoft,
+          fillColor: filled ? kTrueSaffron.withValues(alpha: 0.1) : kLuxGoldSoft,
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -349,9 +356,12 @@ class _OTPScreenState extends State<OTPScreen>
           ),
         ),
         onChanged: (val) {
-          if (val.isNotEmpty && index < 5)
+          if (val.isNotEmpty && index < 5) {
             _focusNodes[index + 1].requestFocus();
-          if (val.isEmpty && index > 0) _focusNodes[index - 1].requestFocus();
+          }
+          if (val.isEmpty && index > 0) {
+            _focusNodes[index - 1].requestFocus();
+          }
           setState(() {});
         },
       ),
