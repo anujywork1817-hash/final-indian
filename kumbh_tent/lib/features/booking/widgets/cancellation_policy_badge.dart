@@ -59,9 +59,13 @@ class CancellationPolicyBadge extends StatelessWidget {
   /// the tier badge shown on the tent-detail and booking screens.
   static PolicyBadgeVisuals visualsFor(Map<String, dynamic> tent) {
     final type = (tent['cancellation_policy_type'] as String?) ?? 'FREE_CANCELLATION';
-    final freeHours = (tent['free_cancellation_hours'] as num?)?.toInt() ?? 168;
-    final penaltyPct = (tent['partial_refund_penalty_percent'] as num?)?.toDouble() ?? 30;
-    final freeDays = (freeHours / 24).round();
+    // Free window is 24 hours before check-in; a partial-refund fee
+    // applies to cancellations made after that (see also
+    // terms_screen.dart's published policy, which must stay in sync
+    // with this default and with the backend's own configured
+    // REFUND_TIERS).
+    final freeHours = (tent['free_cancellation_hours'] as num?)?.toInt() ?? 24;
+    final penaltyPct = (tent['partial_refund_penalty_percent'] as num?)?.toDouble() ?? 25;
 
     if (type == 'NON_REFUNDABLE') {
       return PolicyBadgeVisuals(
@@ -81,14 +85,20 @@ class CancellationPolicyBadge extends StatelessWidget {
     return PolicyBadgeVisuals(
       emoji: '🟢',
       title: 'Free Cancellation',
-      explanation: freeDays > 0
-          ? 'Free up to $freeDays day${freeDays == 1 ? '' : 's'} before check-in, '
+      explanation: freeHours > 0
+          ? 'Free up to ${_windowLabel(freeHours)} before check-in, '
               'then a ${penaltyPct.toStringAsFixed(0)}% fee applies.'
           : 'Free cancellation window applies — see booking summary for the exact deadline.',
       foreground: Colors.green.shade800,
       background: Colors.green.shade50,
       border: Colors.green.shade200,
     );
+  }
+
+  static String _windowLabel(int hours) {
+    if (hours < 48) return '$hours hour${hours == 1 ? '' : 's'}';
+    final days = (hours / 24).round();
+    return '$days day${days == 1 ? '' : 's'}';
   }
 }
 

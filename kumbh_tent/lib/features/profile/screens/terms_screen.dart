@@ -35,9 +35,8 @@ class TermsScreen extends StatelessWidget {
       icon: '🔄',
       title: 'Cancellation & Refund Policy',
       body:
-          '• Cancellations made 7+ days before check-in: 80% refund\n'
-          '• Cancellations made 3-6 days before check-in: 50% refund\n'
-          '• Cancellations made within 48 hours: No refund\n'
+          '• Cancellations made 24+ hours before check-in: Full refund\n'
+          '• Cancellations made within 24 hours of check-in: 25% cancellation fee applies\n'
           '• Refunds are processed within 3-4 working days\n'
           '• Refunds will be credited to the original payment method',
     ),

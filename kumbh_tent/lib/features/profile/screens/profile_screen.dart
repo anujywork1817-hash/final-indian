@@ -9,6 +9,7 @@ import 'package:kumbh_tent/features/auth/screens/login_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/my_bookings_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/edit_profile_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/cancellations_screen.dart';
+import 'package:kumbh_tent/features/profile/screens/wishlist_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/privacy_policy_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/terms_screen.dart';
 // KYC entry point removed from Settings. kyc_screen.dart is
@@ -374,6 +375,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             context,
                             MaterialPageRoute(
                               builder: (_) => const MyBookingsScreen(),
+                            ),
+                          ),
+                        ),
+                        _menuItem(
+                          Icons.favorite_border_rounded,
+                          'Wishlist',
+                          'Tents you\'ve saved',
+                          () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const WishlistScreen(),
                             ),
                           ),
                         ),

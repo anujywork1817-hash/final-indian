@@ -20,6 +20,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSaved = false;
   bool _isLoading = true;
   String _phone = '';
+  String? _nameError;
+  String? _emailError;
+
+  bool _isValidEmail(String email) =>
+      RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
 
   @override
   void initState() {
@@ -62,8 +67,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _saveProfile() async {
-    if (_nameController.text.trim().isEmpty) {
-      _snack('Please enter your name', AppColors.error);
+    final name = _nameController.text.trim();
+    final email = _emailController.text.trim();
+    setState(() {
+      _nameError = name.isEmpty ? 'Please enter your name' : null;
+      _emailError = email.isEmpty
+          ? 'Email is required'
+          : !_isValidEmail(email)
+          ? 'Enter a valid email address'
+          : null;
+    });
+    if (_nameError != null || _emailError != null) {
+      _snack('Please fix the highlighted fields', AppColors.error);
       return;
     }
     setState(() => _isSaving = true);
@@ -141,14 +156,26 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                 'Enter your full name',
                                 _nameController,
                                 icon: Icons.person_outline_rounded,
+                                errorText: _nameError,
+                                onChanged: (_) {
+                                  if (_nameError != null) {
+                                    setState(() => _nameError = null);
+                                  }
+                                },
                               ),
                               _divider(),
                               _field(
-                                'Email (optional)',
+                                'Email',
                                 'Enter your email',
                                 _emailController,
                                 icon: Icons.mail_outline_rounded,
                                 keyboardType: TextInputType.emailAddress,
+                                errorText: _emailError,
+                                onChanged: (_) {
+                                  if (_emailError != null) {
+                                    setState(() => _emailError = null);
+                                  }
+                                },
                               ),
                               _divider(),
                               Column(
@@ -365,23 +392,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                   ),
                 ),
-                Positioned(
-                  right: -2,
-                  bottom: -2,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldWarm,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_rounded,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                  ),
-                ),
               ],
             ),
           ],
@@ -418,52 +428,78 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     TextEditingController controller, {
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
-  }) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        label,
-        style: GoogleFonts.poppins(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.textPrimary,
-        ),
-      ),
-      const SizedBox(height: 10),
-      TextField(
-        controller: controller,
-        keyboardType: keyboardType,
-        style: GoogleFonts.poppins(
-          fontSize: 14,
-          color: AppColors.textPrimary,
-        ),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: GoogleFonts.poppins(
-            color: AppColors.textMuted,
+    String? errorText,
+    ValueChanged<String>? onChanged,
+  }) {
+    final hasError = errorText != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
             fontSize: 13,
-          ),
-          prefixIcon: Icon(icon, size: 18, color: AppColors.saffron),
-          filled: true,
-          fillColor: AppColors.softSurface,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.saffron, width: 1.8),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 13,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
         ),
-      ),
-    ],
-  );
+        const SizedBox(height: 10),
+        TextField(
+          controller: controller,
+          keyboardType: keyboardType,
+          onChanged: onChanged,
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            color: AppColors.textPrimary,
+          ),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: GoogleFonts.poppins(
+              color: AppColors.textMuted,
+              fontSize: 13,
+            ),
+            errorText: errorText,
+            errorStyle: GoogleFonts.poppins(
+              fontSize: 11,
+              color: AppColors.error,
+            ),
+            prefixIcon: Icon(
+              icon,
+              size: 18,
+              color: hasError ? AppColors.error : AppColors.saffron,
+            ),
+            filled: true,
+            fillColor: AppColors.softSurface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: hasError ? AppColors.error : AppColors.saffron,
+                width: 1.8,
+              ),
+            ),
+            errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error),
+            ),
+            focusedErrorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error, width: 1.8),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }
