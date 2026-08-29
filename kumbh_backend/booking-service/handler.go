@@ -561,6 +561,15 @@ func cancelBooking(c *gin.Context) {
 		)
 	}
 
+	// Cancellation confirmation push. The customer-facing `message`
+	// already states the refund outcome, so it doubles as the body
+	// rather than re-deriving the wording here and risking the two
+	// disagreeing.
+	go notifyUser(phone, NotifBookingCancelled, ref,
+		"Booking cancelled",
+		fmt.Sprintf("Your booking at %s (Ref: %s) is cancelled. %s", tentName, ref, message),
+	)
+
 	c.JSON(http.StatusOK, gin.H{
 		"message":           message,
 		"booking_ref":       ref,

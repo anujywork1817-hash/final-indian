@@ -47,6 +47,9 @@ func main() {
 	// ── Auto-mark no-shows past their tent's cutoff ───────
 	go startNoShowSweeper()
 
+	// ── Hourly Kumbh news poll → push on new articles ─────
+	startNewsPoller()
+
 	r := gin.Default()
 
 	r.Use(func(c *gin.Context) {
@@ -68,6 +71,17 @@ func main() {
 	})
 
 	r.POST("/bookings", createBooking)
+
+	// ── Push notifications, favourites, snan calendar ──
+	r.GET("/notifications/preferences", getNotificationPrefs)
+	r.PUT("/notifications/preferences", setNotificationPref)
+	r.GET("/notifications/history", getNotificationHistory)
+	r.GET("/favourites", listFavourites)
+	r.POST("/favourites", addFavourite)
+	r.DELETE("/favourites/:tentId", removeFavourite)
+	r.GET("/snan-events", listSnanEvents)
+	r.POST("/snan-reminders", addSnanReminder)
+	r.DELETE("/snan-reminders/:date", removeSnanReminder)
 	r.GET("/bookings", myBookings)
 	r.PUT("/bookings/:ref/cancel", cancelBooking)
 	r.DELETE("/bookings/:ref", deleteBooking)
@@ -162,5 +176,6 @@ func startReminderScheduler() {
 		fmt.Printf("⏰ Next reminder run in: %s\n", waitDuration.Round(time.Minute))
 		time.Sleep(waitDuration)
 		sendBookingReminders()
+		runNotificationJobs()
 	}
 }

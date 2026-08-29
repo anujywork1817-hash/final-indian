@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:kumbh_tent/core/constants/snan_calendar.dart';
+import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
 
@@ -22,11 +23,80 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
   late DateTime _selectedDay;
   CalendarFormat _format = CalendarFormat.month;
 
+  /// Dates (yyyy-MM-dd) this user has asked to be reminded about.
+  /// Fetched from the server so a reminder set on one device shows
+  /// on another; the local set only mirrors it for instant repaint.
+  Set<String> _reminders = {};
+  bool _busyDate = false;
+
   @override
   void initState() {
     super.initState();
     _focusedDay = kSnanFocusedDay;
     _selectedDay = _focusedDay;
+    _loadReminders();
+  }
+
+  static String _key(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _loadReminders() async {
+    try {
+      final events = await ApiService.getSnanEvents();
+      if (!mounted) return;
+      setState(() {
+        _reminders = {
+          for (final e in events)
+            if (e['reminder_set'] == true) e['date'] as String,
+        };
+      });
+    } catch (_) {
+      // Offline or logged out — the bells just render unset.
+    }
+  }
+
+  Future<void> _toggleReminder(DateTime date) async {
+    if (_busyDate) return;
+    final key = _key(date);
+    final wasSet = _reminders.contains(key);
+
+    setState(() {
+      _busyDate = true;
+      wasSet ? _reminders.remove(key) : _reminders.add(key);
+    });
+
+    try {
+      if (wasSet) {
+        await ApiService.removeSnanReminder(key);
+      } else {
+        await ApiService.addSnanReminder(key);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          duration: const Duration(seconds: 2),
+          content: Text(
+            wasSet
+                ? 'Reminder removed'
+                : 'Reminder set — we will notify you the day before',
+          ),
+        ),
+      );
+    } catch (e) {
+      // Roll back: the server never accepted it, so the bell must
+      // not keep claiming a reminder exists.
+      if (!mounted) return;
+      setState(() => wasSet ? _reminders.add(key) : _reminders.remove(key));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Could not update reminder. Please sign in and retry.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _busyDate = false);
+    }
   }
 
   @override
@@ -617,6 +687,25 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
                     fontWeight: FontWeight.w600,
                     color: AppColors.textSecondary,
                   ),
+                ),
+              ),
+            // Reminder bell — only for dates still ahead; there is
+            // nothing to remind anyone about once the day has passed.
+            if (days >= 0)
+              IconButton(
+                onPressed: () => _toggleReminder(e.date),
+                tooltip: _reminders.contains(_key(e.date))
+                    ? 'Remove reminder'
+                    : 'Remind me',
+                visualDensity: VisualDensity.compact,
+                icon: Icon(
+                  _reminders.contains(_key(e.date))
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_none_rounded,
+                  size: 20,
+                  color: _reminders.contains(_key(e.date))
+                      ? AppColors.goldWarm
+                      : AppColors.textMuted,
                 ),
               ),
           ],

@@ -282,4 +282,81 @@ class ApiService {
     );
     return res.data;
   }
+
+  // ── Favourites ────────────────────────────────────────────────
+  // Server-backed as of the push-notification work: favourites used
+  // to live only in an in-memory Set, so they vanished on restart
+  // and the backend could not send price-drop / low-stock alerts.
+  static Future<List<dynamic>> getFavourites() async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return [];
+    final res = await _dio.get('/favourites', queryParameters: {'phone': phone});
+    return res.data['favourites'] ?? [];
+  }
+
+  static Future<void> addFavourite(int tentId) async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return;
+    await _dio.post('/favourites', data: {'phone': phone, 'tent_id': tentId});
+  }
+
+  static Future<void> removeFavourite(int tentId) async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return;
+    await _dio.delete('/favourites/$tentId', queryParameters: {'phone': phone});
+  }
+
+  // ── Snan calendar + reminders ─────────────────────────────────
+  // Passing the phone makes each event carry `reminder_set`, so the
+  // bell renders correctly in one round trip.
+  static Future<List<dynamic>> getSnanEvents() async {
+    final phone = await _storage.read(key: 'user_phone');
+    final res = await _dio.get(
+      '/snan-events',
+      queryParameters: phone == null ? null : {'phone': phone},
+    );
+    return res.data['events'] ?? [];
+  }
+
+  static Future<void> addSnanReminder(String date) async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return;
+    await _dio.post('/snan-reminders', data: {'phone': phone, 'date': date});
+  }
+
+  static Future<void> removeSnanReminder(String date) async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return;
+    await _dio.delete('/snan-reminders/$date', queryParameters: {'phone': phone});
+  }
+
+  // ── Notification preferences / history ────────────────────────
+  static Future<List<dynamic>> getNotificationPrefs() async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return [];
+    final res = await _dio.get(
+      '/notifications/preferences',
+      queryParameters: {'phone': phone},
+    );
+    return res.data['preferences'] ?? [];
+  }
+
+  static Future<void> setNotificationPref(String type, bool enabled) async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return;
+    await _dio.put(
+      '/notifications/preferences',
+      data: {'phone': phone, 'type': type, 'enabled': enabled},
+    );
+  }
+
+  static Future<List<dynamic>> getNotificationHistory() async {
+    final phone = await _storage.read(key: 'user_phone');
+    if (phone == null) return [];
+    final res = await _dio.get(
+      '/notifications/history',
+      queryParameters: {'phone': phone},
+    );
+    return res.data['notifications'] ?? [];
+  }
 }

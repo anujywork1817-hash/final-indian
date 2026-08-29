@@ -81,6 +81,21 @@ func main() {
 	r.POST("/api/v1/auth/admin/change-username", proxy(authURL+"/auth/admin/change-username"))
 	r.GET("/api/v1/auth/admin/list", proxy(authURL+"/auth/admin/list"))
 	r.POST("/api/v1/auth/admin/create", proxy(authURL+"/auth/admin/create"))
+	// ── Push notifications / favourites / snan calendar ──
+	r.GET("/api/v1/notifications/preferences", proxy(bookingURL+"/notifications/preferences"))
+	r.PUT("/api/v1/notifications/preferences", proxy(bookingURL+"/notifications/preferences"))
+	r.GET("/api/v1/notifications/history", proxy(bookingURL+"/notifications/history"))
+	r.GET("/api/v1/favourites", proxy(bookingURL+"/favourites"))
+	r.POST("/api/v1/favourites", proxy(bookingURL+"/favourites"))
+	r.DELETE("/api/v1/favourites/:tentId", func(c *gin.Context) {
+		proxy(bookingURL + "/favourites/" + c.Param("tentId"))(c)
+	})
+	r.GET("/api/v1/snan-events", proxy(bookingURL+"/snan-events"))
+	r.POST("/api/v1/snan-reminders", proxy(bookingURL+"/snan-reminders"))
+	r.DELETE("/api/v1/snan-reminders/:date", func(c *gin.Context) {
+		proxy(bookingURL + "/snan-reminders/" + c.Param("date"))(c)
+	})
+
 	r.GET("/api/v1/admin/bookings", proxy(bookingURL+"/admin/bookings"))
 	r.PUT("/api/v1/admin/bookings/:ref/status", func(c *gin.Context) { proxy(bookingURL + "/admin/bookings/" + c.Param("ref") + "/status")(c) })
 	r.GET("/api/v1/admin/stats", proxy(bookingURL+"/admin/stats"))

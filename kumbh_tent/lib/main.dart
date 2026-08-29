@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:kumbh_tent/shared/widgets/wishlist_button.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -99,6 +102,12 @@ void main() async {
       }
     });
   }
+
+  // Favourites are server-side now, so the local heart cache has to
+  // be primed or every tent renders unsaved until the user toggles
+  // one. Fire-and-forget: a slow network must not delay first paint,
+  // and the store repaints itself via its ValueNotifier when it lands.
+  unawaited(WishlistStore.instance.load());
 
   runApp(const ProviderScope(child: KumbhTentApp()));
 }
