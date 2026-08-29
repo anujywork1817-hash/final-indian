@@ -86,7 +86,7 @@ double gstRateFor(double taxableAmount) =>
     taxableAmount > kGSTThreshold ? kGSTRateHigh : kGSTRateLow;
 
 // ── App Info ─────────────────────────────────────────────
-const String kAppName = 'Kumbh Tent Booking';
+const String kAppName = 'Bharat Tent Booking';
 const String kAppVersion = 'v1.0.0';
 const String kAppTagline = 'Nashik Kumbh 2027';
 

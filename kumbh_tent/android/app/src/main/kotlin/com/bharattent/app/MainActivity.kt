@@ -1,4 +1,4 @@
-package com.kumbhtent.app
+package com.bharattent.app
 
 import io.flutter.embedding.android.FlutterActivity
 

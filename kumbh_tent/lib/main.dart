@@ -24,8 +24,8 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 
 // ── Notification channel ──────────────────────────────────
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'kumbh_tent_channel',
-  'Kumbh Tent Notifications',
+  'bharat_tent_channel',
+  'Bharat Tent Notifications',
   description: 'Booking confirmations and reminders',
   importance: Importance.high,
 );
@@ -118,7 +118,7 @@ class KumbhTentApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kumbh Tent',
+      title: 'Bharat Tent',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: const SplashScreen(),

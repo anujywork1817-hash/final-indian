@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.kumbhtent.app"
+    namespace = "com.bharattent.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -21,7 +21,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.kumbhtent.app"
+        applicationId = "com.bharattent.app"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
