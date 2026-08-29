@@ -21,19 +21,12 @@ class _NewsScreenState extends State<NewsScreen> {
   List<NewsItem> _liveNews = const [];
   bool _loadingLive = true;
 
-  static const _filters = [
-    'All',
-    'Live',
-    'Kumbh 2027',
-    'Kumbh 2026',
-    'Advisory',
-  ];
+  static const _filters = ['All', 'Live', 'Kumbh 2027', 'Advisory'];
 
   static const _filterIcons = {
     'All': Icons.grid_view_rounded,
     'Live': Icons.podcasts_rounded,
     'Kumbh 2027': Icons.water_drop_rounded,
-    'Kumbh 2026': Icons.history_rounded,
     'Advisory': Icons.campaign_rounded,
   };
 

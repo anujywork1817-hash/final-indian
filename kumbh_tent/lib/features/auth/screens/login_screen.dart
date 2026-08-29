@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kumbh_tent/features/auth/screens/otp_screen.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
-import 'package:kumbh_tent/core/constants/constants.dart';
+import 'package:kumbh_tent/core/theme/app_colors.dart';
+import 'package:kumbh_tent/shared/widgets/premium_button.dart';
+import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
 
 class PhoneLoginScreen extends StatefulWidget {
   const PhoneLoginScreen({super.key});
@@ -16,6 +18,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
     with SingleTickerProviderStateMixin {
   final _phoneController = TextEditingController();
   bool _isLoading = false;
+  String? _phoneError;
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
 
@@ -39,292 +42,271 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kTrueSaffronPale,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // ── Hero header ───────────────────────────────────
-            Container(
-              height: 260,
-              width: double.infinity,
-              color: kTrueSaffron,
-              child: SafeArea(
-                child: FadeTransition(
-                  opacity: _fadeAnim,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 64,
-                        height: 64,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: kTrueSaffronDark,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.4),
-                            width: 1,
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: FadeTransition(
+            opacity: _fadeAnim,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── Hero ───────────────────────────────────────
+                  Center(
+                    child: Column(
+                      children: [
+                        Container(
+                          width: 76,
+                          height: 76,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [AppColors.saffron, AppColors.goldWarm],
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.saffron.withValues(
+                                  alpha: 0.3,
+                                ),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.holiday_village_rounded,
+                            color: Colors.white,
+                            size: 34,
                           ),
                         ),
-                        child: const Icon(
-                          Icons.holiday_village_outlined,
-                          color: Colors.white,
-                          size: 30,
+                        const SizedBox(height: 16),
+                        Text(
+                          'Welcome to Kumbh Tent',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.textPrimary,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'Welcome to Kumbh',
-                        style: GoogleFonts.cormorantGaramond(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
+                        const SizedBox(height: 4),
+                        Text(
+                          'NASHIK KUMBH 2027',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'NASHIK 2027',
-                        style: GoogleFonts.poppins(
-                          color: Colors.white70,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 2.5,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ),
-            ),
 
-            // ── Form body ─────────────────────────────────────
-            FadeTransition(
-              opacity: _fadeAnim,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome',
-                      style: GoogleFonts.cormorantGaramond(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w600,
-                        color: kDark,
-                        letterSpacing: 0.3,
+                  const SizedBox(height: 32),
+
+                  Text(
+                    'Enter your phone number',
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'We\'ll send a 6-digit OTP to verify your number',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ── Phone input ───────────────────────────
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.softSurface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: _phoneError != null
+                            ? AppColors.error
+                            : AppColors.border,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Enter your phone number to continue',
-                      style: GoogleFonts.poppins(
-                        fontSize: 13,
-                        color: kLuxMuted,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-
-                    // ── Phone input ───────────────────────────
-                    Container(
-                      decoration: BoxDecoration(
-                        color: kLuxGoldSoft,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: kTrueSaffron.withValues(alpha: 0.25),
+                    child: Row(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          child: Text(
+                            '+91',
+                            style: GoogleFonts.poppins(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.saffron,
+                            ),
+                          ),
+                        ),
+                        Container(
                           width: 1,
+                          height: 24,
+                          color: AppColors.border,
                         ),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 16,
+                        Expanded(
+                          child: TextField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            maxLength: 10,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                            onChanged: (_) {
+                              if (_phoneError != null) {
+                                setState(() => _phoneError = null);
+                              }
+                            },
+                            style: GoogleFonts.poppins(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.textPrimary,
+                              letterSpacing: 2,
                             ),
-                            decoration: BoxDecoration(
-                              border: Border(
-                                right: BorderSide(
-                                  color: kTrueSaffron.withValues(alpha: 0.25),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            child: Text(
-                              '+91',
-                              style: GoogleFonts.poppins(
+                            decoration: InputDecoration(
+                              counterText: '',
+                              hintText: 'Mobile number',
+                              hintStyle: GoogleFonts.poppins(
+                                color: AppColors.textMuted,
+                                letterSpacing: 1,
                                 fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: kTrueSaffron,
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 16,
                               ),
                             ),
                           ),
-                          Expanded(
-                            child: TextField(
-                              controller: _phoneController,
-                              keyboardType: TextInputType.phone,
-                              maxLength: 10,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                              ],
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: kDark,
-                                letterSpacing: 2,
-                              ),
-                              decoration: InputDecoration(
-                                counterText: '',
-                                hintText: 'Enter Mobile Number',
-                                hintStyle: GoogleFonts.poppins(
-                                  color: kLuxBorder,
-                                  letterSpacing: 2,
-                                  fontSize: 15,
-                                ),
-                                border: InputBorder.none,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // ── Send OTP button ───────────────────────
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: kTrueSaffron,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 0,
                         ),
-                        onPressed: _isLoading ? null : _sendOTP,
-                        child: _isLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(
-                                'Send OTP',
-                                style: GoogleFonts.poppins(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
-                                ),
-                              ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-
-                    Center(
+                  ),
+                  if (_phoneError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6, left: 4),
                       child: Text(
-                        'We\'ll send a 6-digit OTP to verify your number',
-                        textAlign: TextAlign.center,
+                        _phoneError!,
                         style: GoogleFonts.poppins(
                           fontSize: 11,
-                          color: kLuxMuted,
+                          color: AppColors.error,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 28),
+                  const SizedBox(height: 20),
 
-                    // ── Key dates card ────────────────────────
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: kLuxGoldSoft,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: kTrueSaffron.withValues(alpha: 0.25),
-                          width: 1,
+                  // ── Send OTP button ───────────────────────
+                  PremiumButton(
+                    label: 'Send OTP',
+                    icon: Icons.arrow_forward_rounded,
+                    verticalPadding: 16,
+                    onPressed: _isLoading ? null : _sendOTP,
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  // ── Key dates card ────────────────────────
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.cardBorder),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.05),
+                          blurRadius: 14,
+                          offset: const Offset(0, 4),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: kTrueSaffron.withValues(alpha: 0.06),
-                            blurRadius: 12,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'KUMBH 2027 — KEY DATES',
-                            style: GoogleFonts.poppins(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: kTrueSaffron,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _dateRow(
-                            'Jan 14',
-                            'Makar Sankranti — First Shahi Snan',
-                          ),
-                          _divider(),
-                          _dateRow(
-                            'Jan 29',
-                            'Mauni Amavasya — Peak Day',
-                            isPeak: true,
-                          ),
-                          _divider(),
-                          _dateRow('Feb 2', 'Basant Panchami'),
-                          _divider(),
-                          _dateRow('Feb 26', 'Maha Shivratri — Final Snan'),
-                        ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.saffron.withValues(
+                                  alpha: 0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(
+                                Icons.event_note_rounded,
+                                size: 15,
+                                color: AppColors.saffron,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'KUMBH 2027 — KEY DATES',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        _dateRow(
+                          'Jan 14',
+                          'Makar Sankranti — First Shahi Snan',
+                        ),
+                        _divider(),
+                        _dateRow(
+                          'Jan 29',
+                          'Mauni Amavasya — Peak Day',
+                          isPeak: true,
+                        ),
+                        _divider(),
+                        _dateRow('Feb 2', 'Basant Panchami'),
+                        _divider(),
+                        _dateRow('Feb 26', 'Maha Shivratri — Final Snan'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _divider() =>
-      Divider(height: 1, thickness: 0.8, color: kTrueSaffron.withValues(alpha: 0.15));
+      const Divider(height: 1, thickness: 1, color: AppColors.border);
 
   Widget _dateRow(String date, String name, {bool isPeak = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         children: [
-          Container(
-            width: 5,
-            height: 5,
-            margin: const EdgeInsets.only(right: 10),
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              color: kTrueSaffron,
-            ),
-          ),
           SizedBox(
-            width: 48,
+            width: 52,
             child: Text(
               date,
               style: GoogleFonts.poppins(
                 fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: kTrueSaffron,
+                fontWeight: FontWeight.w700,
+                color: AppColors.saffronDark,
               ),
             ),
           ),
@@ -332,30 +314,14 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
             child: Text(
               name,
               style: GoogleFonts.poppins(
-                fontSize: 11,
-                color: isPeak ? kDark : kLuxMuted,
-                fontWeight: isPeak ? FontWeight.w500 : FontWeight.w400,
+                fontSize: 12,
+                color: isPeak ? AppColors.textPrimary : AppColors.textMuted,
+                fontWeight: isPeak ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ),
           if (isPeak)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: kTrueSaffron.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: kTrueSaffron.withValues(alpha: 0.3)),
-              ),
-              child: Text(
-                'PEAK',
-                style: GoogleFonts.poppins(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: kTrueSaffron,
-                  letterSpacing: 0.8,
-                ),
-              ),
-            ),
+            const PremiumBadge(label: 'PEAK', style: PremiumBadgeStyle.gold),
         ],
       ),
     );
@@ -363,20 +329,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
 
   void _sendOTP() async {
     if (_phoneController.text.length != 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Enter a valid 10-digit number',
-            style: GoogleFonts.poppins(color: Colors.white),
-          ),
-          backgroundColor: kTrueSaffronDark,
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      setState(() => _phoneError = 'Enter a valid 10-digit number');
       return;
     }
     setState(() => _isLoading = true);
@@ -390,7 +343,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
             'OTP: ${res['otp']}',
             style: GoogleFonts.poppins(color: Colors.white),
           ),
-          backgroundColor: kTrueSaffronDark,
+          backgroundColor: AppColors.saffronDark,
           duration: const Duration(seconds: 3),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -413,7 +366,7 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
             'Error: $e',
             style: GoogleFonts.poppins(color: Colors.white),
           ),
-          backgroundColor: Colors.red.shade900,
+          backgroundColor: AppColors.error,
           duration: const Duration(seconds: 5),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
