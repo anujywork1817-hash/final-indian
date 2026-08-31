@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"time"
 
@@ -34,6 +35,11 @@ func main() {
 	}
 	fmt.Println("✅ Booking Service — DB connected!")
 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(2 * time.Minute)
+
 	// ── Refund policy ─────────────────────────────────────
 	refundPolicy = loadRefundPolicy()
 	fmt.Printf("💸 Refund policy: %s\n", refundPolicy.Describe())
@@ -50,7 +56,9 @@ func main() {
 	// ── Hourly Kumbh news poll → push on new articles ─────
 	startNewsPoller()
 
-	r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
 
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -161,7 +169,15 @@ func main() {
 		port = "8083"
 	}
 	fmt.Printf("🚀 Booking Service running on :%s\n", port)
-	r.Run(":" + port)
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
 }
 
 func startReminderScheduler() {

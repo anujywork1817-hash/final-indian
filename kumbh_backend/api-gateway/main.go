@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -34,7 +35,9 @@ func main() {
 		paymentURL = "http://localhost:8084"
 	}
 
-	r := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	r := gin.New()
+	r.Use(gin.Recovery())
 
 	r.Use(func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -237,11 +240,29 @@ func main() {
 		port = "8080"
 	}
 	fmt.Printf("🚀 API Gateway running on :%s\n", port)
-	r.Run(":" + port)
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+	log.Fatal(srv.ListenAndServe())
+}
+
+// Shared transport across all proxy() clients: the default http.Transport
+// caps MaxIdleConnsPerHost at 2, which serialized every burst of concurrent
+// requests to the same backend service behind repeated TCP handshakes and
+// collapsed throughput under load testing.
+var proxyTransport = &http.Transport{
+	MaxIdleConns:        500,
+	MaxIdleConnsPerHost: 200,
+	IdleConnTimeout:     90 * time.Second,
 }
 
 func proxy(target string) gin.HandlerFunc {
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 30 * time.Second, Transport: proxyTransport}
 	return func(c *gin.Context) {
 		body, _ := io.ReadAll(c.Request.Body)
 		targetURL := target

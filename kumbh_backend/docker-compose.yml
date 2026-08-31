@@ -5,6 +5,10 @@ services:
     image: postgres:15-alpine
     container_name: kumbh_postgres
     profiles: ["local"]
+    # Every other service is unless-stopped; without it here the DB
+    # stayed down after a Docker daemon restart and took the whole
+    # stack with it (services crash-loop on "lookup postgres").
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
