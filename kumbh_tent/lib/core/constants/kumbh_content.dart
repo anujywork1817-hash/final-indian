@@ -105,7 +105,7 @@ const List<HistoryVideo> kHistoryVideos = <HistoryVideo>[
   // HistoryVideo(
   //   title: 'Origins of the Simhastha Kumbh',
   //   description: 'Why Nashik and Trimbakeshwar host the Kumbh.',
-  //   url: 'https://www.youtube.com/watch?v=XXXXXXXXXXX',
+  //   url: 'https://youtu.be/QS7vZj9-OAc?si=bKQd8Q2XmiyzSa3N',
   //   duration: '8:24',
   // ),
 ];

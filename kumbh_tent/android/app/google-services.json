@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "652266735464",
-    "project_id": "kumbh-tent-19e88",
-    "storage_bucket": "kumbh-tent-19e88.firebasestorage.app"
+    "project_number": "1098594747363",
+    "project_id": "bharat-tent",
+    "storage_bucket": "bharat-tent.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:652266735464:android:699159f3539c5fdfc678dd",
+        "mobilesdk_app_id": "1:1098594747363:android:ccfb31b701b6aaa2b156d6",
         "android_client_info": {
-          "package_name": "com.kumbhtent.app"
+          "package_name": "com.bharattent.app"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyA0nxTHLijTagKSzV4n4nJgA-hYE09SX7E"
+          "current_key": "AIzaSyA8il22hWbjRInCzF7Lz-6Wsp02j56CYNk"
         }
       ],
       "services": {
