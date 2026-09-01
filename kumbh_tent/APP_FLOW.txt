@@ -1,0 +1,171 @@
+KUMBH TENT APP — FULL APP FLOW
+================================
+(Generated from lib/ source structure — kumbh_tent Flutter app)
+
+1. APP START
+------------
+main.dart -> KumbhTentApp (MaterialApp)
+  - Initializes Firebase (push notifications) on Android/iOS only (skipped on web)
+  - Requests notification permission, saves FCM token locally
+  - Preloads wishlist (favourites) in the background
+  - home: SplashScreen
+
+2. SPLASH SCREEN  (features/auth/screens/splash_screen.dart)
+--------------------------------------------------------------
+  - Shows animated saffron/orange branded splash ("Kumbh", Simhastha Nashik 2027)
+  - After ~2.8s, checks flutter_secure_storage for 'auth_token'
+      - Token exists -> HomeScreen
+      - No token     -> PhoneLoginScreen (login_screen.dart)
+
+3. AUTHENTICATION FLOW
+------------------------
+  PhoneLoginScreen (login_screen.dart)
+      -> enter phone number -> OTPScreen (otp_screen.dart), passing phone
+
+  OTPScreen (otp_screen.dart)
+      -> enter OTP, verify
+      -> if user has no name saved      -> NameSetupScreen (name_setup_screen.dart)
+      -> if user already has a name     -> HomeScreen
+
+  NameSetupScreen (name_setup_screen.dart)
+      -> enter name -> HomeScreen
+
+4. HOME SCREEN  (features/home/screens/home_screen.dart)
+------------------------------------------------------------
+  Bottom navigation with 5 tabs (IndexedStack, state preserved across tabs):
+      0. Explore   -> BrowseScreen
+      1. Bookings  -> MyBookingsScreen
+      2. News      -> NewsScreen
+      3. History   -> HistoryScreen
+      4. Profile   -> ProfileScreen
+
+  Back-button behavior:
+      - On any tab other than Explore -> pressing back returns to Explore tab
+      - On Explore tab -> pressing back shows "Exit App?" confirmation dialog
+
+5. EXPLORE / BROWSE  (features/tents/screens/browse_screen.dart)
+------------------------------------------------------------------
+  - Lists available tents (cards: image, price, "View Details")
+  - Search icon      -> SearchScreen (search_screen.dart)
+  - Calendar icon     -> SnanCalendarScreen (kumbh/screens/snan_calendar_screen.dart)
+                          (shows auspicious bathing dates for Kumbh Mela)
+  - Tap "View Details" on a tent card -> TentDetailScreen (tent = selected tent)
+      (disabled / shows "Sold Out" if tent is unavailable)
+
+  SearchScreen (search_screen.dart)
+      -> search/filter tents -> tap a result -> TentDetailScreen
+
+6. TENT DETAIL SCREEN  (features/tents/screens/tent_detail_screen.dart)
+---------------------------------------------------------------------------
+  - Image carousel, wishlist (heart) toggle button
+  - Tent name, location, distance from Sangam
+  - Surge pricing note (if applicable)
+  - Amenities list (AC, Private Bath, Jacuzzi, Meals, WiFi, Butler, etc.)
+  - Policies (check-in/out time)
+  - Bottom bar: total price + "Book Now" button
+      -> BookingFormScreen (tent passed in)
+
+  NOTE: "Free Cancellation" badge was removed from this screen.
+
+7. BOOKING FORM  (features/booking/screens/booking_form_screen.dart)
+-------------------------------------------------------------------------
+  - Select check-in / check-out dates (calendar)
+  - "Traveling with children?" toggle
+  - Number of tents/units
+  - Coupon code entry ("Try: KUMBH10, PILGRIM15, ..."), "View All" -> CouponsScreen
+  - Price breakdown: base price x nights x units, CGST 6%, SGST 6%, total payable
+  - Bottom button:
+      - If no dates selected -> "Select dates to continue" (disabled)
+      - If dates selected    -> "Coming Soon" button
+            -> opens ComingSoonScreen (shared/screens/coming_soon_screen.dart)
+               ("Online booking & payments are temporarily on hold")
+
+  NOTE: Payment is currently ON HOLD.
+      - "Free Cancellation" badge was removed from this screen.
+      - The original payment path (_proceedToPayment -> PaymentScreen) is still
+        present in code but not wired to the button; it can be restored later.
+
+  CouponsScreen (booking/screens/coupons_screen.dart)
+      -> browse/apply available coupon codes, returns to BookingFormScreen
+
+  [ON HOLD] PaymentScreen (features/payment/screens/payment_screen.dart)
+      -> (previously) reached from BookingFormScreen's "Proceed to pay"
+      -> handles Razorpay payment
+      -> on success -> ETicketScreen (booking/screens/e_ticket_screen.dart)
+
+8. MY BOOKINGS  (features/booking/screens/my_bookings_screen.dart)
+------------------------------------------------------------------------
+  - Lists user's past/upcoming bookings
+  - Tap a booking -> view ticket -> ETicketScreen (e_ticket_screen.dart)
+  - Leave a review -> ReviewScreen (review_screen.dart), passing booking
+  - Empty state -> "Browse Tents" -> BrowseScreen
+
+  ETicketScreen (e_ticket_screen.dart)
+      - Shows QR/e-ticket for a confirmed booking
+
+  ReviewScreen (review_screen.dart)
+      - Submit a rating/review for a completed stay
+
+9. NEWS  (features/news/screens/news_screen.dart)
+----------------------------------------------------
+  - Shows Kumbh Mela related news/updates (via core/network/news_service.dart)
+
+10. HISTORY  (features/history/screens/history_screen.dart)
+------------------------------------------------------------
+  - Shows past activity / booking history timeline
+
+11. PROFILE  (features/profile/screens/profile_screen.dart)
+------------------------------------------------------------
+  - User info summary
+  - Menu options:
+      -> Edit Profile         -> EditProfileScreen (edit_profile_screen.dart)
+      -> My Bookings          -> MyBookingsScreen
+      -> Wishlist             -> WishlistScreen (wishlist_screen.dart)
+      -> Cancellations        -> CancellationsScreen (cancellations_screen.dart)
+      -> Privacy Policy       -> PrivacyPolicyScreen (privacy_policy_screen.dart)
+      -> Terms & Conditions   -> TermsScreen (terms_screen.dart)
+      -> KYC                  -> KYCScreen (kyc_screen.dart)
+      -> Logout confirmation dialog
+
+  WishlistScreen (wishlist_screen.dart)
+      - Lists saved/favourited tents
+      - Tap a tent -> TentDetailScreen
+      - Empty state -> "Browse Tents" -> BrowseScreen
+
+  CancellationsScreen (cancellations_screen.dart)
+      - Lists cancelled bookings and refund status
+      - Uses RefundStatusPanel widget (booking/widgets/refund_status_panel.dart)
+      - Can navigate to a booking's e-ticket/detail
+
+  EditProfileScreen (edit_profile_screen.dart)
+      - Update name, email, KYC-related info
+
+  KYCScreen (kyc_screen.dart)
+      - Upload/verify identity documents
+
+  PrivacyPolicyScreen / TermsScreen
+      - Static informational/legal content
+
+12. SUPPORTING / SHARED
+--------------------------
+  - shared/widgets/premium_button.dart      -> reusable primary CTA button
+  - shared/widgets/premium_badge.dart       -> "LUXURY" / tier badge on tent cards
+  - shared/widgets/wishlist_button.dart     -> heart icon + WishlistStore (state)
+  - shared/widgets/tent_image_carousel.dart -> image carousel used on detail screen
+  - shared/widgets/shimmer_tent_card.dart   -> loading skeleton for tent cards
+  - shared/widgets/glass_shine_banner.dart  -> promo banner widget
+  - shared/screens/coming_soon_screen.dart  -> placeholder "on hold" screen (new)
+  - core/network/api_service.dart           -> backend API calls (Go backend)
+  - core/network/news_service.dart          -> news feed API calls
+  - core/constants/*                        -> app-wide constants, static content,
+                                                Kumbh snan (bathing) calendar data
+  - core/theme/*                            -> colors, spacing, typography, app theme
+
+CURRENT STATE SUMMARY
+------------------------
+  - Full auth -> browse -> book flow exists end-to-end in code.
+  - Booking/payment is intentionally DISABLED at the last step: the booking
+    form's action button always leads to a "Coming Soon" screen instead of
+    the real payment flow, per current product decision to pause payments.
+  - Everything else (browse, search, wishlist, bookings history, news,
+    profile, KYC, cancellations) is fully wired and unaffected.

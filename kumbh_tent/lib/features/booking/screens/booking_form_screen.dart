@@ -8,8 +8,8 @@ import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/payment/screens/payment_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/coupons_screen.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
-import 'package:kumbh_tent/features/booking/widgets/cancellation_policy_badge.dart';
 import 'package:kumbh_tent/shared/widgets/premium_button.dart';
+import 'package:kumbh_tent/shared/screens/coming_soon_screen.dart';
 
 class BookingFormScreen extends StatefulWidget {
   final Map<String, dynamic> tent;
@@ -997,9 +997,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
             const SizedBox(height: 24),
 
-            CancellationPolicyBadge(tent: widget.tent),
-            const SizedBox(height: 24),
-
             // ── 8. Price breakdown ──────────────────────────────
             if (_nights > 0) ...[
               _smallLabel('PRICE BREAKDOWN'),
@@ -1110,10 +1107,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       )
                     : PremiumButton(
                         label: _nights > 0
-                            ? 'Proceed to pay'
+                            ? 'Coming Soon'
                             : 'Select dates to continue',
                         verticalPadding: 16,
-                        onPressed: _nights > 0 ? _proceedToPayment : null,
+                        onPressed: _nights > 0
+                            ? () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const ComingSoonScreen(),
+                                  ),
+                                )
+                            : null,
                       ),
               ),
             ],

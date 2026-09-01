@@ -4,7 +4,6 @@ import 'package:kumbh_tent/features/booking/screens/booking_form_screen.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
-import 'package:kumbh_tent/features/booking/widgets/cancellation_policy_badge.dart';
 import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
 import 'package:kumbh_tent/shared/widgets/wishlist_button.dart';
 import 'package:kumbh_tent/shared/widgets/tent_image_carousel.dart';
@@ -211,9 +210,6 @@ class _TentDetailScreenState extends State<TentDetailScreen> {
                       ),
                     ),
                   if (isSurge) const SizedBox(height: 16),
-
-                  CancellationPolicyBadge(tent: tent),
-                  const SizedBox(height: 20),
 
                   // ── Amenities ─────────────────────────────────
                   _sectionTitle('Amenities'),
