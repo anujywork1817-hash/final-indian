@@ -67,11 +67,21 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#FAF3E8"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
 
 flutter:
   uses-material-design: true
 
   assets:
+    - assets/icon/app_icon.png
     - assets/images/regular capsule tent.png
     - assets/images/regular all view.png
     - assets/images/regular inside view.png
