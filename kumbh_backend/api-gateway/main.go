@@ -76,6 +76,12 @@ func main() {
 	r.GET("/api/v1/tents/:id/reviews", func(c *gin.Context) {
 		proxy(tentURL + "/tents/" + c.Param("id") + "/reviews")(c)
 	})
+	// Availability lives in booking-service (it needs the bookings
+	// table), not tent-service, even though the URL reads like a
+	// tent sub-resource.
+	r.GET("/api/v1/tents/:id/availability", func(c *gin.Context) {
+		proxy(bookingURL + "/tents/" + c.Param("id") + "/availability")(c)
+	})
 	r.GET("/api/v1/coupons", proxy(bookingURL+"/coupons"))
 
 	r.POST("/api/v1/auth/kyc", proxy(authURL+"/auth/kyc"))

@@ -65,7 +65,7 @@ func sendFCMNotification(fcmToken, title, body string) {
 			},
 			"android": map[string]interface{}{
 				"notification": map[string]string{
-					"channel_id": "kumbh_tent_channel",
+					"channel_id": "bharat_tent_channel",
 					"icon":       "ic_launcher",
 				},
 			},

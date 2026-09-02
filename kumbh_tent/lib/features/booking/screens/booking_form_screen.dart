@@ -1,3 +1,5 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -58,10 +60,158 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   int _childrenAbove5 = 0;
   static const double _childFeePerNight = 500.0;
 
+  // ── Per-date availability (for calendar color coding) ───────
+  //
+  // date-string ('YYYY-MM-DD') -> remaining units that day. Loaded
+  // once for the whole bookable window so every visible month is
+  // colored without a fetch per page-swipe; refreshed after a
+  // successful booking so colors reflect the new state immediately.
+  final Map<String, int> _remainingByDate = {};
+  int _tentTotalUnits = 0;
+  bool _availabilityLoading = true;
+
+  final DateTime _calendarFirstDay = DateTime.now();
+  final DateTime _calendarLastDay = DateTime(2027, 10, 31);
+
   @override
   void initState() {
     super.initState();
     _loadUserDetails();
+    _loadAvailability();
+  }
+
+  String _dateKey(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _loadAvailability() async {
+    setState(() => _availabilityLoading = true);
+    try {
+      final data = await ApiService.getTentAvailability(
+        tentId: widget.tent['id'].toString(),
+        start: _dateKey(_calendarFirstDay),
+        // end is exclusive, so pass the day after the last bookable day.
+        end: _dateKey(_calendarLastDay.add(const Duration(days: 1))),
+      );
+      final days = data['days'] as List<dynamic>? ?? [];
+      if (!mounted) return;
+      setState(() {
+        _tentTotalUnits = (data['total_units'] as num?)?.toInt() ??
+            (widget.tent['total_units'] as num?)?.toInt() ??
+            0;
+        _remainingByDate.clear();
+        for (final d in days) {
+          _remainingByDate[d['date'] as String] =
+              (d['remaining_units'] as num).toInt();
+        }
+      });
+    } catch (_) {
+      // Availability is a UI hint (color coding), not the source of
+      // truth — createBooking re-validates for real. If this fetch
+      // fails, fall back to letting every future date look normal
+      // rather than blocking the calendar entirely.
+    } finally {
+      if (mounted) setState(() => _availabilityLoading = false);
+    }
+  }
+
+  /// Remaining units for [day], or the tent's total if we have no
+  /// data for it yet (e.g. still loading, or outside the fetched
+  /// window) — fails open visually rather than showing every date
+  /// as sold out before the network call lands.
+  int _remainingFor(DateTime day) =>
+      _remainingByDate[_dateKey(day)] ?? _tentTotalUnits;
+
+  bool _isDaySelectable(DateTime day) {
+    final today = DateTime.now();
+    final todayMidnight = DateTime(today.year, today.month, today.day);
+    if (day.isBefore(todayMidnight)) return false;
+    if (_tentTotalUnits > 0 && _remainingFor(day) <= 0) return false;
+
+    // A start date is already picked and we're choosing the end —
+    // every date the range would span must still have at least 1
+    // unit free, or this can't be a valid end date.
+    if (_checkIn != null && _checkOut == null && day.isAfter(_checkIn!)) {
+      for (DateTime d = _checkIn!;
+          !d.isAfter(day);
+          d = d.add(const Duration(days: 1))) {
+        if (_tentTotalUnits > 0 && _remainingFor(d) <= 0) return false;
+      }
+    }
+    return true;
+  }
+
+  Widget _availabilityLegendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: GoogleFonts.poppins(fontSize: 10, color: AppColors.textMuted),
+        ),
+      ],
+    );
+  }
+
+  /// Colors a day cell green/amber/red by remaining-units percentage.
+  /// Returns null (falls back to table_calendar's own default look)
+  /// once availability hasn't loaded yet, so dates don't flash red
+  /// before the fetch lands.
+  Widget? _buildAvailabilityCell(DateTime day) {
+    if (_tentTotalUnits <= 0) return null;
+    final remaining = _remainingFor(day);
+    final isPast = day.isBefore(
+      DateTime.now().subtract(const Duration(days: 1)),
+    );
+    if (isPast) return null;
+
+    Color? bg;
+    Color textColor = AppColors.textPrimary;
+    bool strikeThrough = false;
+    if (remaining <= 0) {
+      bg = AppColors.error.withValues(alpha: 0.12);
+      textColor = AppColors.error;
+      strikeThrough = true;
+    } else if (remaining <= (_tentTotalUnits * 0.2).ceil()) {
+      bg = AppColors.warning.withValues(alpha: 0.20);
+      textColor = AppColors.saffronDark;
+    } else {
+      // > 20% remaining — normal appearance, let the default style show.
+      return null;
+    }
+
+    return Container(
+      margin: const EdgeInsets.all(4),
+      decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '${day.day}',
+            style: GoogleFonts.poppins(
+              fontSize: 12,
+              color: textColor,
+              fontWeight: FontWeight.w600,
+              decoration: strikeThrough ? TextDecoration.lineThrough : null,
+            ),
+          ),
+          if (!strikeThrough)
+            Text(
+              '$remaining left',
+              style: GoogleFonts.poppins(fontSize: 7, color: textColor),
+            ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadUserDetails() async {
@@ -213,6 +363,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       final serverBase = (serverBooking['base_amount'] as num).toDouble();
       final serverDiscount = (serverBooking['discount'] as num).toDouble();
       final serverTax = (serverBooking['tax'] as num).toDouble();
+      // Units just booked are no longer free — refresh so the
+      // calendar's colors reflect the new state immediately.
+      unawaited(_loadAvailability());
       if (mounted) {
         Navigator.push(
           context,
@@ -238,6 +391,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
         if (e.toString().contains('409') ||
             e.toString().contains('not available')) {
           msg = '🚫 Tent already booked for selected dates.';
+          // Our cached colors were stale — someone else took those
+          // units between page-load and submit. Refresh so the
+          // calendar reflects reality before the user tries again.
+          unawaited(_loadAvailability());
         } else if (e.toString().contains('400')) {
           msg = 'Invalid booking details.';
         } else if (e.toString().contains('401')) {
@@ -506,6 +663,23 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
+                  if (_availabilityLoading)
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 8),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                  // Legend
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _availabilityLegendDot(AppColors.success, 'Available'),
+                      const SizedBox(width: 14),
+                      _availabilityLegendDot(AppColors.warning, 'Few left'),
+                      const SizedBox(width: 14),
+                      _availabilityLegendDot(AppColors.error, 'Sold out'),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
                   // Calendar
                   TableCalendar(
                     firstDay: DateTime.now(),
@@ -514,6 +688,11 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     rangeStartDay: _checkIn,
                     rangeEndDay: _checkOut,
                     rangeSelectionMode: RangeSelectionMode.toggledOn,
+                    enabledDayPredicate: _isDaySelectable,
+                    calendarBuilders: CalendarBuilders(
+                      defaultBuilder: (context, day, focusedDay) =>
+                          _buildAvailabilityCell(day),
+                    ),
                     calendarStyle: CalendarStyle(
                       rangeHighlightColor: AppColors.saffron.withValues(
                         alpha: 0.15,

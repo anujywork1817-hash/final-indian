@@ -146,6 +146,21 @@ class ApiService {
     return res.data;
   }
 
+  // Per-date unit availability for the booking calendar's color
+  // coding. start/end are 'YYYY-MM-DD'; end is exclusive, same as
+  // check_in/check_out everywhere else.
+  static Future<Map<String, dynamic>> getTentAvailability({
+    required String tentId,
+    required String start,
+    required String end,
+  }) async {
+    final res = await _dio.get(
+      '/tents/$tentId/availability',
+      queryParameters: {'start': start, 'end': end},
+    );
+    return res.data;
+  }
+
   // ── Bookings ──────────────────────────────────────────────────
   static Future<Map<String, dynamic>> createBooking({
     required String tentId,

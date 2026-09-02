@@ -1,28 +1,40 @@
-# ============================================================
-# PRODUCTION compose file — this is what Elastic Beanstalk deploys.
-#
-# Every service here pulls a pre-built image from ECR instead of
-# building from source on the instance. A cold instance building 5
-# Go services from scratch (go mod download + go build x5) was
-# observed taking 30-60+ minutes and repeatedly timing out/hanging
-# EB deploys (2026-09-02 incident). Pulling a ready image takes
-# seconds instead.
-#
-# Build and push new images with scripts/build-and-push.sh (or .ps1)
-# before deploying a code change — `eb deploy` alone does NOT
-# rebuild these images, it only picks up this compose file and
-# whatever image tag it points at.
-#
-# For local development with live source (docker compose build),
-# use docker-compose.dev.yml instead — that one still has `build:`
-# contexts and the local Postgres container.
-# ============================================================
-
 services:
+
+  # ── PostgreSQL (local dev only — AWS uses RDS via DATABASE_URL) ──
+  postgres:
+    image: postgres:15-alpine
+    container_name: kumbh_postgres
+    profiles: ["local"]
+    # Every other service is unless-stopped; without it here the DB
+    # stayed down after a Docker daemon restart and took the whole
+    # stack with it (services crash-loop on "lookup postgres").
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kumbh_tent
+    ports:
+      - "0.0.0.0:${POSTGRES_HOST_PORT:-5435}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # initdb runs these in lexical order, so schema.sql must
+      # sort before the migrations. Prefixed accordingly.
+      - ./schema.sql:/docker-entrypoint-initdb.d/00_schema.sql
+      - ./migrations/001_create_refunds.sql:/docker-entrypoint-initdb.d/01_refunds.sql
+      - ./migrations/002_missing_tables.sql:/docker-entrypoint-initdb.d/02_missing_tables.sql
+      - ./migrations/003_refund_approval.sql:/docker-entrypoint-initdb.d/03_refund_approval.sql
+      - ./migrations/004_cancellation_policy.sql:/docker-entrypoint-initdb.d/04_cancellation_policy.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # ── API Gateway ──────────────────────────────────────
   api-gateway:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/api-gateway:latest
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
     container_name: kumbh_gateway
     ports:
       - "0.0.0.0:${GATEWAY_PORT:-8085}:8080"
@@ -42,41 +54,62 @@ services:
 
   # ── Auth Service ──────────────────────────────────────
   auth-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/auth-service:latest
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
     container_name: kumbh_auth
     ports:
       - "0.0.0.0:8081:8081"
     environment:
       - AUTH_SERVICE_PORT=8081
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
       - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
 
   # ── Tent Service ──────────────────────────────────────
   tent-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/tent-service:latest
+    build:
+      context: .
+      dockerfile: tent-service/Dockerfile
     container_name: kumbh_tents
     ports:
       - "0.0.0.0:8082:8082"
     environment:
       - TENT_SERVICE_PORT=8082
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
 
   # ── Booking Service ──────────────────────────────────
   booking-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/booking-service:latest
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
     container_name: kumbh_bookings
     ports:
       - "0.0.0.0:8083:8083"
     environment:
       - BOOKING_SERVICE_PORT=8083
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
       - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
+      # Booking service issues refunds, so it needs Razorpay
+      # credentials too — not just payment-service.
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
+      # ── Refund policy ────────────────────────────────
+      # Empty REFUND_TIERS = 100% refund at any notice.
+      # See .env.example for the T&C-matching alternative.
       - REFUND_ENABLED=${REFUND_ENABLED:-true}
+      # Cancellations create a refund REQUEST; staff approve it
+      # in the admin panel before any money moves.
       - REFUND_REQUIRE_APPROVAL=${REFUND_REQUIRE_APPROVAL:-true}
       - REFUND_TIERS=${REFUND_TIERS:-}
       - REFUND_FEE_PERCENT=${REFUND_FEE_PERCENT:-0}
@@ -84,6 +117,7 @@ services:
       - REFUND_MAX_ATTEMPTS=${REFUND_MAX_ATTEMPTS:-6}
       - REFUND_RETRY_INTERVAL_MINUTES=${REFUND_RETRY_INTERVAL_MINUTES:-15}
       - RAZORPAY_REFUND_SPEED=${RAZORPAY_REFUND_SPEED:-normal}
+      # ── Booking confirmation email ───────────────────
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
@@ -92,21 +126,28 @@ services:
       - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Kumbh Tent Booking}
     volumes:
       - ./booking-service/firebase-service-account.json:/app/firebase-service-account.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
 
   # ── Payment Service ──────────────────────────────────
   payment-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/payment-service:latest
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
     container_name: kumbh_payments
     ports:
       - "0.0.0.0:8084:8084"
     environment:
       - PAYMENT_SERVICE_PORT=8084
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
       - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
       - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
       - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
+      # ── Booking confirmation email ───────────────────
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
@@ -115,4 +156,11 @@ services:
       - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Kumbh Tent Booking}
     volumes:
       - ./payment-service/firebase-service-account.json:/app/firebase-service-account.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
     restart: unless-stopped
+
+volumes:
+  postgres_data:

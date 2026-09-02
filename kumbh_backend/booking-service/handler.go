@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -130,39 +131,39 @@ func createBooking(c *gin.Context) {
 		return
 	}
 
-	// ── Step 2: Count already booked units for these dates ────
-	// Safe — no other request can slip in between (lock held)
-	var bookedUnits int
-	err = tx.QueryRow(`
-		SELECT COALESCE(SUM(units), 0) FROM bookings
-		WHERE tent_id = $1
-		AND status NOT IN ('cancelled')
-		AND check_in < $3::date
-		AND check_out > $2::date
-	`, req.TentID, req.CheckIn, req.CheckOut).Scan(&bookedUnits)
-
+	// ── Step 2: Per-day booked units for every date in range ──
+	// Safe — no other request can slip in between (tents row is
+	// locked FOR UPDATE above, and every booking-writing path locks
+	// the same row first, so concurrent attempts for this tent are
+	// fully serialized here even though this query itself has no
+	// row lock of its own).
+	_, days, err := dailyAvailability(tx, req.TentID, req.CheckIn, req.CheckOut)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "availability check failed"})
 		return
 	}
 
-	// ── Step 3: Check if enough units available ───────────────
-	remainingUnits := totalUnits - bookedUnits
-	if remainingUnits <= 0 {
-		c.JSON(http.StatusConflict, gin.H{
-			"error":           "All tents are fully booked for selected dates. Please choose different dates.",
-			"total_units":     totalUnits,
-			"booked_units":    bookedUnits,
-			"remaining_units": 0,
-		})
-		return
+	// ── Step 3: Every date in the range must have enough units ─
+	// A date-range booking is only valid if EVERY day in it clears
+	// the bar — one bad day (e.g. a middle night already full)
+	// must reject the whole range, not just the days that fail.
+	var shortDates []string
+	minRemaining := totalUnits
+	for _, d := range days {
+		remaining := totalUnits - d.BookedUnits
+		if remaining < minRemaining {
+			minRemaining = remaining
+		}
+		if remaining < req.Units {
+			shortDates = append(shortDates, d.Date)
+		}
 	}
-	if req.Units > remainingUnits {
+	if len(shortDates) > 0 {
 		c.JSON(http.StatusConflict, gin.H{
-			"error":           fmt.Sprintf("Only %d tent(s) available for selected dates.", remainingUnits),
+			"error":           fmt.Sprintf("Not enough units available for: %s", strings.Join(shortDates, ", ")),
+			"dates":           shortDates,
 			"total_units":     totalUnits,
-			"booked_units":    bookedUnits,
-			"remaining_units": remainingUnits,
+			"remaining_units": minRemaining,
 		})
 		return
 	}
@@ -274,7 +275,7 @@ func createBooking(c *gin.Context) {
 			"tax":             tax,
 			"total_amount":    totalAmount,
 			"status":          "pending",
-			"remaining_units": remainingUnits - req.Units,
+			"remaining_units": minRemaining - req.Units,
 		},
 		"message": "Booking created! Complete payment to confirm.",
 	})

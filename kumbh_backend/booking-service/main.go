@@ -79,6 +79,7 @@ func main() {
 	})
 
 	r.POST("/bookings", createBooking)
+	r.GET("/tents/:id/availability", getTentAvailability)
 
 	// ── Push notifications, favourites, snan calendar ──
 	r.GET("/notifications/preferences", getNotificationPrefs)
