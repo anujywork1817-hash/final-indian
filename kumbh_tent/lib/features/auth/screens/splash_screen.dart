@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -20,6 +22,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   late Animation<double> _ringAnim;
   late Animation<double> _fadeAnim;
+
+  // Held so they can be cancelled in dispose() — otherwise a widget
+  // test that pumps the splash and tears down before ~2.8s fails with
+  // "A Timer is still pending even after the widget tree was disposed".
+  Timer? _fadeTimer;
+  Timer? _navTimer;
 
   static const _storage = FlutterSecureStorage();
 
@@ -50,10 +58,10 @@ class _SplashScreenState extends State<SplashScreen>
     _fadeAnim = CurvedAnimation(parent: _fadeController, curve: Curves.easeOut);
 
     _ringController.forward();
-    Future.delayed(const Duration(milliseconds: 300), () {
+    _fadeTimer = Timer(const Duration(milliseconds: 300), () {
       if (mounted) _fadeController.forward();
     });
-    Future.delayed(const Duration(milliseconds: 2800), _navigate);
+    _navTimer = Timer(const Duration(milliseconds: 2800), _navigate);
   }
 
   Future<void> _navigate() async {
@@ -83,6 +91,8 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   void dispose() {
+    _fadeTimer?.cancel();
+    _navTimer?.cancel();
     _ringController.dispose();
     _fadeController.dispose();
     super.dispose();
