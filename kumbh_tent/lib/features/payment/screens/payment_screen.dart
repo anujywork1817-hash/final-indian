@@ -53,7 +53,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _authToken = '';
 
   static const _storage = FlutterSecureStorage();
-  static const String _razorpayKey = 'rzp_test_SqpASBdCN2DXd0';
+  // Must match RAZORPAY_KEY_ID on the backend — the SDK here opens
+  // checkout with this key, the order was created server-side with
+  // the same account's key, and a mismatch fails immediately with a
+  // generic "Payment Failed" (no useful detail from Razorpay's SDK).
+  static const String _razorpayKey = 'rzp_test_TZnmTJ5wGDBox2';
 
   int get _nights => widget.checkOut.difference(widget.checkIn).inDays;
 

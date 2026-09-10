@@ -11,7 +11,6 @@ import 'package:kumbh_tent/features/payment/screens/payment_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/coupons_screen.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
 import 'package:kumbh_tent/shared/widgets/premium_button.dart';
-import 'package:kumbh_tent/shared/screens/coming_soon_screen.dart';
 
 class BookingFormScreen extends StatefulWidget {
   final Map<String, dynamic> tent;
@@ -39,7 +38,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
   String _genderPreference = 'Other';
   String _bedType = 'Single';
-  String _idType = 'Aadhaar';
+  final String _idType = 'Aadhaar';
 
   String? _nameError;
   String? _phoneError;
@@ -172,9 +171,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     );
     if (isPast) return null;
 
-    Color? bg;
-    Color textColor = AppColors.textPrimary;
+    Color bg;
+    Color textColor;
     bool strikeThrough = false;
+    bool isNormal = false;
     if (remaining <= 0) {
       bg = AppColors.error.withValues(alpha: 0.12);
       textColor = AppColors.error;
@@ -183,8 +183,15 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       bg = AppColors.warning.withValues(alpha: 0.20);
       textColor = AppColors.saffronDark;
     } else {
-      // > 20% remaining — normal appearance, let the default style show.
-      return null;
+      // > 20% remaining — green, same as every other available day.
+      // Drawn explicitly (not left to fall back to table_calendar's
+      // own default look) so Saturday/Sunday get identical treatment
+      // to weekdays — the library's built-in weekendTextStyle grays
+      // weekends out on its own, which made an available Sat/Sun
+      // look booked even though it wasn't.
+      bg = AppColors.success.withValues(alpha: 0.12);
+      textColor = AppColors.success;
+      isNormal = true;
     }
 
     return Container(
@@ -204,7 +211,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
               decoration: strikeThrough ? TextDecoration.lineThrough : null,
             ),
           ),
-          if (!strikeThrough)
+          if (!strikeThrough && !isNormal)
             Text(
               '$remaining left',
               style: GoogleFonts.poppins(fontSize: 7, color: textColor),
@@ -240,9 +247,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       ? 0
       : _checkOut!.difference(_checkIn!).inDays;
   double get _baseTotal => widget.tent['price'] * _nights * _units.toDouble();
+  // A Double bed is a bigger tent footprint than a Single, so it
+  // costs more — same idea as Airbnb charging more for a bigger
+  // room. Only shown/added when it actually applies (Double
+  // selected); a Single booking's total is unaffected.
+  static const double _doubleBedSurchargeRate = 0.20;
+  double get _bedTypeSurcharge => _bedType == 'Double'
+      ? _baseTotal * _doubleBedSurchargeRate
+      : 0;
   double get _childrenCharge =>
       _hasChildren ? _childrenAbove5 * _childFeePerNight * _nights : 0;
-  double get _addonsTotal => _childrenCharge;
+  double get _addonsTotal => _bedTypeSurcharge + _childrenCharge;
 
   // Under-5s are free but capped at 2 per tent (matches common
   // hotel/camp policy for a shared bed); total children can never
@@ -260,12 +275,12 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
   // ── Capacity limits ─────────────────────────────────────────
   //
-  // A Single bed sleeps up to 2 guests per tent, a Double bed up
-  // to 4 — previously the guest and tent counters had no upper
-  // bound at all, so a Single-bed booking for 1 tent could still
-  // claim 20 guests. Units are additionally capped by how many
-  // tents the listing actually has available.
-  int get _guestsPerUnit => _bedType == 'Single' ? 2 : 4;
+  // Same rule as Airbnb: the bed you pick is the number of people
+  // it sleeps, no more. A Single bed sleeps 1 guest per tent, a
+  // Double sleeps 2 — not "up to" some larger shared-room number.
+  // Units are additionally capped by how many tents the listing
+  // actually has available.
+  int get _guestsPerUnit => _bedType == 'Single' ? 1 : 2;
   int get _maxGuests => _guestsPerUnit * _units;
   int get _maxUnits {
     final available = widget.tent['available'];
@@ -558,6 +573,13 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     _phoneController,
                     TextInputType.phone,
                     errorText: _phoneError,
+                    // Digits only, capped at 10 — stops the field itself
+                    // from ever holding an 11+ digit number (typed or
+                    // pasted) instead of only catching it on submit.
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
                     onChanged: (_) {
                       if (_phoneError != null) {
                         setState(() => _phoneError = null);
@@ -574,68 +596,34 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Row(
-                    children: ['Aadhaar', 'Passport'].map((t) {
-                      final sel = _idType == t;
-                      return Expanded(
-                        child: GestureDetector(
-                          onTap: () => setState(() {
-                            _idType = t;
-                            _idProofController.clear();
-                            _idProofError = null;
-                          }),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 180),
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              gradient: sel
-                                  ? const LinearGradient(
-                                      colors: [
-                                        AppColors.saffron,
-                                        AppColors.saffronDark,
-                                      ],
-                                    )
-                                  : null,
-                              color: sel ? null : AppColors.softSurface,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: sel
-                                    ? AppColors.saffron
-                                    : AppColors.border,
-                              ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                t,
-                                style: GoogleFonts.poppins(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: sel
-                                      ? Colors.white
-                                      : AppColors.textPrimary,
-                                ),
-                              ),
-                            ),
-                          ),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppColors.saffron, AppColors.saffronDark],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        'Aadhaar',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
                         ),
-                      );
-                    }).toList(),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 12),
                   _field(
-                    _idType == 'Aadhaar'
-                        ? 'Aadhaar number'
-                        : 'Passport number',
-                    _idType == 'Aadhaar' ? '•••• •••• ••••' : 'Enter number',
+                    'Aadhaar number',
+                    '•••• •••• ••••',
                     _idProofController,
-                    _idType == 'Aadhaar'
-                        ? TextInputType.number
-                        : TextInputType.text,
+                    TextInputType.number,
                     errorText: _idProofError,
-                    inputFormatters: _idType == 'Aadhaar'
-                        ? [_AadhaarNumberFormatter()]
-                        : null,
+                    inputFormatters: [_AadhaarNumberFormatter()],
                     onChanged: (_) {
                       if (_idProofError != null) {
                         setState(() => _idProofError = null);
@@ -688,6 +676,13 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     rangeStartDay: _checkIn,
                     rangeEndDay: _checkOut,
                     rangeSelectionMode: RangeSelectionMode.toggledOn,
+                    // Horizontal only — table_calendar's default (`all`)
+                    // also claims vertical drags to toggle month/week
+                    // format, which steals the gesture from the page's
+                    // own scroll before it ever reaches the outer
+                    // SingleChildScrollView. That's what made the whole
+                    // screen feel unscrollable near the calendar.
+                    availableGestures: AvailableGestures.horizontalSwipe,
                     enabledDayPredicate: _isDaySelectable,
                     calendarBuilders: CalendarBuilders(
                       defaultBuilder: (context, day, focusedDay) =>
@@ -773,67 +768,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
 
             const SizedBox(height: 24),
 
-            // ── 4. Guests & tents ───────────────────────────────
-            _smallLabel('GUESTS & TENTS'),
-            const SizedBox(height: 12),
-            _card(
-              child: Column(
-                children: [
-                  _counter(
-                    'Guests',
-                    'Max $_maxGuests with $_bedType bed × $_units tent${_units > 1 ? 's' : ''}',
-                    _guests,
-                    () {
-                      if (_guests > 1) {
-                        setState(() {
-                          _guests--;
-                          _clampChildren();
-                        });
-                      }
-                    },
-                    () {
-                      if (_guests < _maxGuests) {
-                        setState(() => _guests++);
-                      } else {
-                        _snack(
-                          'Max $_maxGuests guests for $_units tent${_units > 1 ? 's' : ''} with $_bedType beds',
-                          AppColors.error,
-                        );
-                      }
-                    },
-                  ),
-                  _divider(),
-                  _counter(
-                    'Tents',
-                    'Units to book ($_maxUnits available)',
-                    _units,
-                    () {
-                      if (_units > 1) {
-                        setState(() {
-                          _units--;
-                          if (_guests > _maxGuests) _guests = _maxGuests;
-                          _clampChildren();
-                        });
-                      }
-                    },
-                    () {
-                      if (_units < _maxUnits) {
-                        setState(() => _units++);
-                      } else {
-                        _snack(
-                          'Only $_maxUnits tent${_maxUnits > 1 ? 's' : ''} available',
-                          AppColors.error,
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // ── 5. Preferences ──────────────────────────────────
+            // ── 4. Preferences ───────────────────────────────────
             _smallLabel('PREFERENCES'),
             const SizedBox(height: 12),
             _card(
@@ -896,42 +831,65 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       );
                     }).toList(),
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.softSurface,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.wc_outlined,
-                          color: AppColors.saffron,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Gender preference: $_genderPreference',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          'set at signup',
-                          style: GoogleFonts.poppins(
-                            fontSize: 10,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── 5. Guests & tents ───────────────────────────────
+            _smallLabel('GUESTS & TENTS'),
+            const SizedBox(height: 12),
+            _card(
+              child: Column(
+                children: [
+                  _counter(
+                    'Guests',
+                    'Max $_maxGuests with $_bedType bed × $_units tent${_units > 1 ? 's' : ''}',
+                    _guests,
+                    () {
+                      if (_guests > 1) {
+                        setState(() {
+                          _guests--;
+                          _clampChildren();
+                        });
+                      }
+                    },
+                    () {
+                      if (_guests < _maxGuests) {
+                        setState(() => _guests++);
+                      } else {
+                        _snack(
+                          'Max $_maxGuests guests for $_units tent${_units > 1 ? 's' : ''} with $_bedType beds',
+                          AppColors.error,
+                        );
+                      }
+                    },
+                  ),
+                  _divider(),
+                  _counter(
+                    'Tents',
+                    'Units to book ($_maxUnits available)',
+                    _units,
+                    () {
+                      if (_units > 1) {
+                        setState(() {
+                          _units--;
+                          if (_guests > _maxGuests) _guests = _maxGuests;
+                          _clampChildren();
+                        });
+                      }
+                    },
+                    () {
+                      if (_units < _maxUnits) {
+                        setState(() => _units++);
+                      } else {
+                        _snack(
+                          'Only $_maxUnits tent${_maxUnits > 1 ? 's' : ''} available',
+                          AppColors.error,
+                        );
+                      }
+                    },
                   ),
                 ],
               ),
@@ -1187,6 +1145,11 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       '₹${widget.tent['price']} × $_nights nights × $_units tent',
                       '₹${_baseTotal.toStringAsFixed(0)}',
                     ),
+                    if (_bedType == 'Double')
+                      _priceRow(
+                        'Double bed (+${(_doubleBedSurchargeRate * 100).toStringAsFixed(0)}%)',
+                        '₹${_bedTypeSurcharge.toStringAsFixed(0)}',
+                      ),
                     if (_hasChildren && _childrenAbove5 > 0)
                       _priceRow(
                         'Child fee (5-12 yrs) × $_childrenAbove5 × $_nights nights',
@@ -1286,17 +1249,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       )
                     : PremiumButton(
                         label: _nights > 0
-                            ? 'Coming Soon'
+                            ? 'Proceed to pay'
                             : 'Select dates to continue',
                         verticalPadding: 16,
-                        onPressed: _nights > 0
-                            ? () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const ComingSoonScreen(),
-                                  ),
-                                )
-                            : null,
+                        onPressed: _nights > 0 ? _proceedToPayment : null,
                       ),
               ),
             ],

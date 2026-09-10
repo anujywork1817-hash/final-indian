@@ -48,7 +48,7 @@ const Color kDark = kLuxDark;
 // same network — for access from outside, that server needs a
 // domain + reverse proxy (see the deployment notes) and this
 // should be swapped to that URL instead.
-const String kBaseUrl = 'http://bharat-tent-api-alb.eba-32svn3rz.ap-south-1.elasticbeanstalk.com/api/v1';
+const String kBaseUrl = 'http://bharat-tent-api-prod.eba-umvanuqr.ap-south-1.elasticbeanstalk.com/api/v1';
 
 // Local Docker Compose on this PC — plain http, not https: the
 // local gateway serves no TLS. localhost works because the phone

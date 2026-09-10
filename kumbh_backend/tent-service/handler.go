@@ -23,6 +23,7 @@ type Tent struct {
 	Amenities    []string `json:"amenities"`
 	Images       []string `json:"images"`
 	Capacity     int      `json:"capacity"`
+	TotalUnits   int      `json:"total_units"`
 	Booked       int      `json:"booked"`
 	Available    int      `json:"available"`
 	Availability string   `json:"availability"` // "available", "limited", "almost_full", "sold_out"
@@ -40,11 +41,11 @@ type Tent struct {
 	NoShowPenaltyPercent        float64 `json:"no_show_penalty_percent"`
 }
 
-func getAvailabilityLabel(available, capacity int) string {
+func getAvailabilityLabel(available, totalUnits int) string {
 	if available <= 0 {
 		return "sold_out"
 	}
-	pct := float64(available) / float64(capacity) * 100
+	pct := float64(available) / float64(totalUnits) * 100
 	if pct <= 10 {
 		return "almost_full"
 	}
@@ -57,17 +58,30 @@ func getAvailabilityLabel(available, capacity int) string {
 func listTents(c *gin.Context) {
 	class := c.Query("class")
 
+	// available/booked here are TODAY's snapshot only (a coarse
+	// "is this tent worth tapping into right now" signal for the
+	// browse grid) — was comparing against t.capacity (guests per
+	// tent, e.g. 2-4) and counting every booking ever made, so a
+	// tent with as few as 2 bookings in its whole history looked
+	// permanently sold out regardless of date or how many physical
+	// units it actually has. Fixed to compare against total_units
+	// (the real unit count) and only count bookings that haven't
+	// checked out yet. The real per-date, per-unit check used at
+	// booking time is booking-service's dailyAvailability — this is
+	// just the list-page badge.
 	query := `
 		SELECT t.id, t.name, t.class, t.location, t.distance, t.rating, t.reviews,
-		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images, t.capacity,
+		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images,
+		       t.capacity, t.total_units,
 		       COUNT(b.id) as booked,
-		       t.capacity - COUNT(b.id) as available,
+		       t.total_units - COUNT(b.id) as available,
 		       t.cancellation_policy_type, t.free_cancellation_hours,
 		       t.partial_refund_penalty_percent, t.late_cancellation_hours,
 		       t.no_show_cutoff_hours, t.no_show_penalty_percent
 		FROM tents t
 		LEFT JOIN bookings b ON b.tent_id = t.id
 		  AND b.status IN ('confirmed', 'pending')
+		  AND b.check_in <= CURRENT_DATE AND b.check_out > CURRENT_DATE
 		WHERE t.is_active = TRUE
 	`
 	args := []interface{}{}
@@ -95,6 +109,7 @@ func listTents(c *gin.Context) {
 			pq.Array(&t.Amenities),
 			pq.Array(&t.Images),
 			&t.Capacity,
+			&t.TotalUnits,
 			&t.Booked,
 			&t.Available,
 			&t.CancellationPolicyType, &t.FreeCancellationHours,
@@ -104,7 +119,7 @@ func listTents(c *gin.Context) {
 		if err != nil {
 			continue
 		}
-		t.Availability = getAvailabilityLabel(t.Available, t.Capacity)
+		t.Availability = getAvailabilityLabel(t.Available, t.TotalUnits)
 		tents = append(tents, t)
 	}
 
@@ -124,15 +139,17 @@ func getTent(c *gin.Context) {
 	var t Tent
 	err := db.QueryRow(`
 		SELECT t.id, t.name, t.class, t.location, t.distance, t.rating, t.reviews,
-		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images, t.capacity,
+		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images,
+		       t.capacity, t.total_units,
 		       COUNT(b.id) as booked,
-		       t.capacity - COUNT(b.id) as available,
+		       t.total_units - COUNT(b.id) as available,
 		       t.cancellation_policy_type, t.free_cancellation_hours,
 		       t.partial_refund_penalty_percent, t.late_cancellation_hours,
 		       t.no_show_cutoff_hours, t.no_show_penalty_percent
 		FROM tents t
 		LEFT JOIN bookings b ON b.tent_id = t.id
 		  AND b.status IN ('confirmed', 'pending')
+		  AND b.check_in <= CURRENT_DATE AND b.check_out > CURRENT_DATE
 		WHERE t.id = $1 AND t.is_active = TRUE
 		GROUP BY t.id
 	`, id).Scan(
@@ -142,6 +159,7 @@ func getTent(c *gin.Context) {
 		pq.Array(&t.Amenities),
 		pq.Array(&t.Images),
 		&t.Capacity,
+		&t.TotalUnits,
 		&t.Booked,
 		&t.Available,
 		&t.CancellationPolicyType, &t.FreeCancellationHours,
@@ -154,7 +172,7 @@ func getTent(c *gin.Context) {
 		return
 	}
 
-	t.Availability = getAvailabilityLabel(t.Available, t.Capacity)
+	t.Availability = getAvailabilityLabel(t.Available, t.TotalUnits)
 	c.JSON(http.StatusOK, t)
 }
 

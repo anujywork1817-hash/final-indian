@@ -18,6 +18,10 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
+  // Guards against a second exit dialog stacking on top of the first
+  // if the back button is pressed again while it's open.
+  bool _exitDialogOpen = false;
+
   // Explore stays at index 0 and Profile moves to the end; News and
   // History sit between Bookings and Profile.
   final List<Widget> _screens = [
@@ -29,13 +33,17 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   Future<void> _handleBack() async {
-    // Any tab other than Explore: back always returns to Explore
-    // first, rather than exiting or popping an empty navigator.
+    // Any tab other than the first: back returns to the first tab
+    // rather than prompting to exit — keeps bottom-nav back behavior.
     if (_currentIndex != 0) {
       setState(() => _currentIndex = 0);
       return;
     }
+    // Already on the first tab of Home → confirm before exiting.
+    if (_exitDialogOpen) return;
+    _exitDialogOpen = true;
     final shouldExit = await _confirmExit();
+    _exitDialogOpen = false;
     if (shouldExit && mounted) SystemNavigator.pop();
   }
 
@@ -53,23 +61,38 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         content: Text(
-          'Are you sure you want to exit Kumbh Tent?',
+          'Are you sure you want to exit?',
           style: GoogleFonts.poppins(
             fontSize: 13,
             color: AppColors.textSecondary,
           ),
         ),
+        actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancel',
-              style: GoogleFonts.poppins(color: AppColors.textSecondary),
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Exit'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.saffron,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              'Exit',
+              style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),

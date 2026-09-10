@@ -16,13 +16,22 @@
 # For local development with live source (docker compose build),
 # use docker-compose.dev.yml instead — that one still has `build:`
 # contexts and the local Postgres container.
+#
+# This same file is shared across multiple EB environments in
+# DIFFERENT AWS accounts (discovered 2026-09-08: bharat-tent-api-alb
+# in one account, bharat-tent-api-prod — the real production — in
+# another). Each account has its own ECR registry, so the registry
+# host is parameterized via $ECR_REGISTRY rather than hardcoded.
+# Default (below) is the first account; bharat-tent-api-prod has
+# ECR_REGISTRY set as an environment property overriding it to its
+# own account's registry — see scripts/build-and-push.sh.
 # ============================================================
 
 services:
 
   # ── API Gateway ──────────────────────────────────────
   api-gateway:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/api-gateway:latest
+    image: ${ECR_REGISTRY:-821279529027.dkr.ecr.ap-south-1.amazonaws.com}/bharat-tent/api-gateway:latest
     container_name: kumbh_gateway
     ports:
       - "0.0.0.0:${GATEWAY_PORT:-8085}:8080"
@@ -42,7 +51,7 @@ services:
 
   # ── Auth Service ──────────────────────────────────────
   auth-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/auth-service:latest
+    image: ${ECR_REGISTRY:-821279529027.dkr.ecr.ap-south-1.amazonaws.com}/bharat-tent/auth-service:latest
     container_name: kumbh_auth
     ports:
       - "0.0.0.0:8081:8081"
@@ -54,7 +63,7 @@ services:
 
   # ── Tent Service ──────────────────────────────────────
   tent-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/tent-service:latest
+    image: ${ECR_REGISTRY:-821279529027.dkr.ecr.ap-south-1.amazonaws.com}/bharat-tent/tent-service:latest
     container_name: kumbh_tents
     ports:
       - "0.0.0.0:8082:8082"
@@ -65,7 +74,7 @@ services:
 
   # ── Booking Service ──────────────────────────────────
   booking-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/booking-service:latest
+    image: ${ECR_REGISTRY:-821279529027.dkr.ecr.ap-south-1.amazonaws.com}/bharat-tent/booking-service:latest
     container_name: kumbh_bookings
     ports:
       - "0.0.0.0:8083:8083"
@@ -96,7 +105,7 @@ services:
 
   # ── Payment Service ──────────────────────────────────
   payment-service:
-    image: 821279529027.dkr.ecr.ap-south-1.amazonaws.com/bharat-tent/payment-service:latest
+    image: ${ECR_REGISTRY:-821279529027.dkr.ecr.ap-south-1.amazonaws.com}/bharat-tent/payment-service:latest
     container_name: kumbh_payments
     ports:
       - "0.0.0.0:8084:8084"

@@ -7,7 +7,13 @@
         android:label="Bharat Tent"
         android:usesCleartextTraffic="true"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:enableOnBackInvokedCallback="true">
+        <!-- Opts into the Android 13+ predictive back APIs so the edge
+             back-swipe gesture is routed through Flutter's back handling
+             (PopScope) instead of the OS finishing the activity straight
+             to the launcher. -->
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

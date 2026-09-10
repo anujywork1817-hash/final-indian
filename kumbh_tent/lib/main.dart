@@ -9,7 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kumbh_tent/core/theme/app_theme.dart';
-import 'package:kumbh_tent/features/auth/screens/splash_screen.dart';
+import 'package:kumbh_tent/shared/screens/app_root.dart';
 
 // ── Background message handler ────────────────────────────
 @pragma('vm:entry-point')
@@ -112,16 +112,32 @@ void main() async {
   runApp(const ProviderScope(child: KumbhTentApp()));
 }
 
-class KumbhTentApp extends StatelessWidget {
+class KumbhTentApp extends StatefulWidget {
   const KumbhTentApp({super.key});
 
   @override
+  State<KumbhTentApp> createState() => _KumbhTentAppState();
+}
+
+class _KumbhTentAppState extends State<KumbhTentApp> {
+  // Held for the app's lifetime so its single Navigator + back
+  // handling survive rebuilds. See AppRouterDelegate.
+  final AppRouterDelegate _routerDelegate = AppRouterDelegate();
+
+  @override
+  void dispose() {
+    _routerDelegate.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return MaterialApp.router(
       title: 'Bharat Tent',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const SplashScreen(),
+      routerDelegate: _routerDelegate,
+      backButtonDispatcher: RootBackButtonDispatcher(),
     );
   }
 } 

@@ -47,27 +47,37 @@ class _SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
+  // Recent searches are scoped per logged-in account (keyed by phone),
+  // not one shared list for the device — otherwise switching accounts
+  // on the same phone leaked the previous account's search history
+  // into the new one's "Recent Searches".
+  Future<String> _recentSearchesKey() async {
+    final phone = await ApiService.getStoredPhone();
+    return 'recent_searches_${phone ?? 'guest'}';
+  }
+
   Future<void> _loadRecentSearches() async {
     final prefs = await SharedPreferences.getInstance();
-    setState(
-      () => _recentSearches = prefs.getStringList('recent_searches') ?? [],
-    );
+    final key = await _recentSearchesKey();
+    setState(() => _recentSearches = prefs.getStringList(key) ?? []);
   }
 
   Future<void> _saveRecentSearch(String query) async {
     if (query.trim().isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    final searches = prefs.getStringList('recent_searches') ?? [];
+    final key = await _recentSearchesKey();
+    final searches = prefs.getStringList(key) ?? [];
     searches.remove(query);
     searches.insert(0, query);
     if (searches.length > 10) searches.removeLast();
-    await prefs.setStringList('recent_searches', searches);
+    await prefs.setStringList(key, searches);
     setState(() => _recentSearches = searches);
   }
 
   Future<void> _clearRecentSearches() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('recent_searches');
+    final key = await _recentSearchesKey();
+    await prefs.remove(key);
     setState(() => _recentSearches = []);
   }
 
@@ -140,6 +150,22 @@ class _SearchScreenState extends State<SearchScreen> {
   void _applyFilter(String key) {
     _searchController.text = key;
     _search(key, save: true);
+  }
+
+  // A Kumbh date isn't text that appears anywhere on a tent (name,
+  // location, class, amenities) — running it through _search() as a
+  // substring match always returned zero results. Tapping a date is
+  // really asking "what can I book for this Kumbh date", and since
+  // every listed tent is generically bookable (day-specific sold-out
+  // is enforced later, at booking time, by the availability check),
+  // that means: show all tents, labeled by the date tapped.
+  void _searchByKumbhDate(String date) {
+    _searchController.text = date;
+    setState(() {
+      _hasSearched = true;
+      _results = List<Map<String, dynamic>>.from(_allTents);
+    });
+    _saveRecentSearch(date);
   }
 
   @override
@@ -418,10 +444,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 final isLast = entry.key == kKumbhDates.length - 1;
                 final d = entry.value;
                 return GestureDetector(
-                  onTap: () {
-                    _searchController.text = d['date']!;
-                    _search(d['date']!, save: true);
-                  },
+                  onTap: () => _searchByKumbhDate(d['date']!),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,

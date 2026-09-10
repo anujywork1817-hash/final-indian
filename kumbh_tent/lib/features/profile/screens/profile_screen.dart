@@ -6,7 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/auth/screens/login_screen.dart';
-import 'package:kumbh_tent/features/booking/screens/my_bookings_screen.dart';
+import 'package:kumbh_tent/features/booking/screens/booking_history_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/edit_profile_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/cancellations_screen.dart';
 import 'package:kumbh_tent/features/profile/screens/wishlist_screen.dart';
@@ -358,23 +358,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _menuCard([
                         _menuItem(
                           Icons.history_outlined,
-                          'Booking History',
-                          'View past bookings',
+                          'History',
+                          'All your bookings — pending, confirmed, cancelled',
                           () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const MyBookingsScreen(),
+                              builder: (_) => const BookingHistoryScreen(),
                             ),
                           ),
                         ),
                         _menuItem(
                           Icons.qr_code_outlined,
                           'My E-Tickets',
-                          'Tap a booking to view QR ticket',
+                          'Tap a booking to view its QR ticket',
                           () => Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => const MyBookingsScreen(),
+                              builder: (_) => const BookingHistoryScreen(
+                                title: 'My E-Tickets',
+                              ),
                             ),
                           ),
                         ),

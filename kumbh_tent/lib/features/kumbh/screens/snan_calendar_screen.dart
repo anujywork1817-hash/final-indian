@@ -360,6 +360,12 @@ class _SnanCalendarScreenState extends State<SnanCalendarScreen> {
         lastDay: kSnanLastDay,
         focusedDay: _focusedDay,
         calendarFormat: _format,
+        // Horizontal only — there's no visible format-toggle button
+        // (formatButtonVisible: false below) so the vertical swipe
+        // this would otherwise enable had no UI affordance anyway,
+        // and was just stealing drags from the outer ListView's
+        // scroll whenever a gesture started on the calendar.
+        availableGestures: AvailableGestures.horizontalSwipe,
         eventLoader: snanEventsOn,
         startingDayOfWeek: StartingDayOfWeek.monday,
         selectedDayPredicate: (d) => isSameDay(d, _selectedDay),
