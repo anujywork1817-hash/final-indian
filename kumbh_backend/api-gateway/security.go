@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	"net/http"
 	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // This codebase deliberately duplicates small per-service helpers
@@ -91,4 +93,83 @@ func secureNumericCode(digits int) string {
 		panic(fmt.Sprintf("crypto/rand failed: %v", err))
 	}
 	return fmt.Sprintf("%0*d", digits, n)
+}
+
+// ── BUG-14 / BUG-23: gateway-level admin authentication ──────────
+//
+// Previously every /api/v1/admin/* route (and the /api/v1/auth/admin/*
+// management routes) was registered straight on the router with no
+// auth — anyone could hit admin stats, user PII, KYC docs, refunds,
+// P&L, etc. adminGuard() runs before all handlers and enforces a
+// valid JWT carrying an admin "role" claim for those path prefixes.
+// Login stays public so admins can obtain a token.
+
+var adminRoles = map[string]bool{
+	"super_admin": true,
+	"admin":       true,
+	"staff":       true,
+}
+
+// verifyAdminToken parses/validates the bearer token and returns its
+// username + role claims. ok is false for any missing/invalid token.
+func verifyAdminToken(authHeader string) (username, role string, ok bool) {
+	tokenStr := strings.TrimSpace(authHeader)
+	if strings.HasPrefix(tokenStr, "Bearer ") {
+		tokenStr = strings.TrimSpace(tokenStr[7:])
+	}
+	if tokenStr == "" {
+		return "", "", false
+	}
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, isHMAC := t.Method.(*jwt.SigningMethodHMAC); !isHMAC {
+			return nil, fmt.Errorf("unexpected signing method")
+		}
+		return jwtSecret(), nil
+	})
+	if err != nil || !token.Valid {
+		return "", "", false
+	}
+	claims, _ := token.Claims.(jwt.MapClaims)
+	if u, isStr := claims["username"].(string); isStr {
+		username = u
+	}
+	if r, isStr := claims["role"].(string); isStr {
+		role = r
+	}
+	return username, role, true
+}
+
+func requiresAdmin(path string) bool {
+	if strings.HasPrefix(path, "/api/v1/admin/") {
+		return true
+	}
+	// /api/v1/auth/admin/* management endpoints — but not login.
+	if strings.HasPrefix(path, "/api/v1/auth/admin/") &&
+		path != "/api/v1/auth/admin/login" {
+		return true
+	}
+	return false
+}
+
+func adminGuard() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !requiresAdmin(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+		username, role, ok := verifyAdminToken(c.GetHeader("Authorization"))
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "admin authentication required"})
+			c.Abort()
+			return
+		}
+		if !adminRoles[role] {
+			c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+			c.Abort()
+			return
+		}
+		c.Set("admin_username", username)
+		c.Set("admin_role", role)
+		c.Next()
+	}
 }

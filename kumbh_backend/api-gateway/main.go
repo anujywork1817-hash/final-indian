@@ -41,6 +41,9 @@ func main() {
 	r.Use(gin.Recovery())
 
 	r.Use(corsMiddleware())
+	// BUG-14: every /api/v1/admin/* (and /api/v1/auth/admin/* except
+	// login) now requires a valid admin-role JWT at the gateway.
+	r.Use(adminGuard())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
