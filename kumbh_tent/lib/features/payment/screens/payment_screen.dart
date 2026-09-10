@@ -4,7 +4,6 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:razorpay_flutter/razorpay_flutter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
@@ -72,10 +71,14 @@ class _PaymentScreenState extends State<PaymentScreen> {
   }
 
   Future<void> _loadCredentials() async {
-    final prefs = await SharedPreferences.getInstance();
+    // BUG-09: verifyOTP() writes the phone/token to FlutterSecureStorage,
+    // not SharedPreferences — reading prefs here left _userPhone empty, so
+    // every payment call went out with a blank X-User-Phone header and was
+    // rejected. Read from the same store ApiService writes to.
+    final phone = await _storage.read(key: kUserPhone);
     final token = await _storage.read(key: kAuthToken);
     setState(() {
-      _userPhone = prefs.getString(kUserPhone) ?? '';
+      _userPhone = phone ?? '';
       _authToken = token ?? '';
     });
   }
@@ -124,12 +127,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
 ''';
 
     final encoded = Uri.encodeComponent(message);
-    // Read phone from secure storage first, then SharedPreferences
-    String storedPhone = await _storage.read(key: 'user_phone') ?? '';
-    if (storedPhone.isEmpty) {
-      final prefs = await SharedPreferences.getInstance();
-      storedPhone = prefs.getString(kUserPhone) ?? '';
-    }
+    String storedPhone = await _storage.read(key: kUserPhone) ?? '';
     if (storedPhone.isEmpty) storedPhone = _userPhone;
     final phone = storedPhone
         .replaceAll('+', '')

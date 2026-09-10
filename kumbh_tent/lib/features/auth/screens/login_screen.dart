@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kumbh_tent/features/auth/screens/otp_screen.dart';
+import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/shared/widgets/premium_button.dart';
@@ -265,20 +266,18 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
                           ],
                         ),
                         const SizedBox(height: 14),
-                        _dateRow(
-                          'Jan 14',
-                          'Makar Sankranti — First Shahi Snan',
-                        ),
-                        _divider(),
-                        _dateRow(
-                          'Jan 29',
-                          'Mauni Amavasya — Peak Day',
-                          isPeak: true,
-                        ),
-                        _divider(),
-                        _dateRow('Feb 2', 'Basant Panchami'),
-                        _divider(),
-                        _dateRow('Feb 26', 'Maha Shivratri — Final Snan'),
+                        // BUG-10: single source of truth — the festival
+                        // calendar lives in constants.dart (kKumbhDates),
+                        // shared with the search screen, instead of a
+                        // second hardcoded copy that could drift.
+                        for (var i = 0; i < kKumbhDates.length; i++) ...[
+                          if (i > 0) _divider(),
+                          _dateRow(
+                            kKumbhDates[i]['date']!,
+                            kKumbhDates[i]['name']!,
+                            isPeak: kKumbhDates[i]['name']!.contains('🔥'),
+                          ),
+                        ],
                       ],
                     ),
                   ),

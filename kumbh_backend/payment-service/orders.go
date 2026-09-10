@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"os"
 	"time"
@@ -55,7 +56,10 @@ func createRazorpayOrder(c *gin.Context) {
 		return
 	}
 
-	amountPaise := int(totalAmount * 100) // Razorpay uses paise
+	// BUG-11: round, don't truncate. int(x*100) on a value like
+	// 8850.00 that floats to 8849.9999999 silently drops a paisa,
+	// so the Razorpay order is ₹0.01 short of the booking total.
+	amountPaise := int(math.Round(totalAmount * 100)) // Razorpay uses paise
 
 	payload := map[string]interface{}{
 		"amount":          amountPaise,

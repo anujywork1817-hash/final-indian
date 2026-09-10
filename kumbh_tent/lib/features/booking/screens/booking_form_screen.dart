@@ -267,7 +267,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   double get _subtotal => _baseTotal + _addonsTotal;
   double get _discount => _couponApplied ? _subtotal * _couponDiscountRate : 0;
   double get _taxableAmount => _subtotal - _discount;
-  double get _gstRate => gstRateFor(_taxableAmount);
+  // BUG-03/04: GST slab is set by the nightly tariff, not the
+  // taxable stay total — matches pricing.go server-side.
+  double get _gstRate => gstRateFor((widget.tent['price'] as num).toDouble());
   double get _tax => _taxableAmount * _gstRate;
   double get _cgst => _tax / 2;
   double get _sgst => _tax / 2;

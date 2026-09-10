@@ -42,6 +42,11 @@ type Tent struct {
 }
 
 func getAvailabilityLabel(available, totalUnits int) string {
+	// BUG-06: a tent with total_units = 0 (not yet configured) used to
+	// divide by zero below and produce NaN/±Inf.
+	if totalUnits <= 0 {
+		return "unavailable"
+	}
 	if available <= 0 {
 		return "sold_out"
 	}
@@ -73,8 +78,8 @@ func listTents(c *gin.Context) {
 		SELECT t.id, t.name, t.class, t.location, t.distance, t.rating, t.reviews,
 		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images,
 		       t.capacity, t.total_units,
-		       COUNT(b.id) as booked,
-		       t.total_units - COUNT(b.id) as available,
+		       COALESCE(SUM(b.units), 0) as booked,
+		       t.total_units - COALESCE(SUM(b.units), 0) as available,
 		       t.cancellation_policy_type, t.free_cancellation_hours,
 		       t.partial_refund_penalty_percent, t.late_cancellation_hours,
 		       t.no_show_cutoff_hours, t.no_show_penalty_percent
@@ -141,8 +146,8 @@ func getTent(c *gin.Context) {
 		SELECT t.id, t.name, t.class, t.location, t.distance, t.rating, t.reviews,
 		       t.price, t.base_price, t.is_surge, t.surge, t.amenities, t.images,
 		       t.capacity, t.total_units,
-		       COUNT(b.id) as booked,
-		       t.total_units - COUNT(b.id) as available,
+		       COALESCE(SUM(b.units), 0) as booked,
+		       t.total_units - COALESCE(SUM(b.units), 0) as available,
 		       t.cancellation_policy_type, t.free_cancellation_hours,
 		       t.partial_refund_penalty_percent, t.late_cancellation_hours,
 		       t.no_show_cutoff_hours, t.no_show_penalty_percent
