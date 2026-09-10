@@ -77,9 +77,9 @@ class _OTPScreenState extends State<OTPScreen>
   Future<void> _resendOTP() async {
     setState(() => _isResending = true);
     try {
-      final res = await ApiService.sendOTP(widget.phone);
+      await ApiService.sendOTP(widget.phone);
       if (mounted) {
-        _snack('OTP: ${res['otp']}', AppColors.saffronDark);
+        _snack('OTP sent to ${widget.phone}', AppColors.saffronDark);
         for (final c in _controllers) {
           c.clear();
         }

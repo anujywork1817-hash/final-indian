@@ -41,7 +41,7 @@ services:
       - TENT_SERVICE_URL=http://tent-service:8082
       - BOOKING_SERVICE_URL=http://booking-service:8083
       - PAYMENT_SERVICE_URL=http://payment-service:8084
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
     depends_on:
       - auth-service
       - tent-service
@@ -58,7 +58,7 @@ services:
     environment:
       - AUTH_SERVICE_PORT=8081
       - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
     restart: unless-stopped
 
   # ── Tent Service ──────────────────────────────────────
@@ -81,10 +81,10 @@ services:
     environment:
       - BOOKING_SERVICE_PORT=8083
       - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:?RAZORPAY_KEY_ID must be set}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:?RAZORPAY_KEY_SECRET must be set}
       - REFUND_ENABLED=${REFUND_ENABLED:-true}
       - REFUND_REQUIRE_APPROVAL=${REFUND_REQUIRE_APPROVAL:-true}
       - REFUND_TIERS=${REFUND_TIERS:-}
@@ -112,9 +112,9 @@ services:
     environment:
       - PAYMENT_SERVICE_PORT=8084
       - DATABASE_URL=${DATABASE_URL}
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:?RAZORPAY_KEY_ID must be set}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:?RAZORPAY_KEY_SECRET must be set}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}

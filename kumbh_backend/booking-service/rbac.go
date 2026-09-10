@@ -2,7 +2,6 @@ package main
 
 import (
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -33,12 +32,8 @@ func adminRoleFromToken(c *gin.Context) (username, role string) {
 	if tokenStr == "" {
 		return "", ""
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "kumbh2027secret"
-	}
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
+		return jwtSecret(), nil
 	})
 	if err != nil || !token.Valid {
 		return "", ""

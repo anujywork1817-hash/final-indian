@@ -16,6 +16,7 @@ import (
 
 func main() {
 	godotenv.Load()
+	requireEnv("JWT_SECRET")
 
 	authURL := os.Getenv("AUTH_SERVICE_URL")
 	tentURL := os.Getenv("TENT_SERVICE_URL")
@@ -39,16 +40,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	r.Use(corsMiddleware())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -321,15 +313,11 @@ func jwtMiddleware() gin.HandlerFunc {
 		if len(tokenStr) > 7 && tokenStr[:7] == "Bearer " {
 			tokenStr = tokenStr[7:]
 		}
-		secret := os.Getenv("JWT_SECRET")
-		if secret == "" {
-			secret = "kumbh2027secret"
-		}
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method")
 			}
-			return []byte(secret), nil
+			return jwtSecret(), nil
 		})
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

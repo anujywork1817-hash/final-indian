@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"time"
@@ -22,17 +21,18 @@ func sendOTP(c *gin.Context) {
 		return
 	}
 
-	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	otp := secureNumericCode(6)
 	otpStore[req.Phone] = otp
 
-	// In production: send via SMS gateway
-	fmt.Printf("OTP for %s: %s\n", req.Phone, otp)
+	// OTP is delivered only via the SMS/notification channel — never
+	// in the HTTP response. Log it only when explicitly opted in.
+	if os.Getenv("OTP_DEBUG") == "true" {
+		fmt.Printf("[OTP_DEBUG] %s -> %s\n", req.Phone, otp)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "OTP sent successfully",
 		"phone":   req.Phone,
-		// Remove otp from response in production!
-		"otp": otp,
 	})
 }
 
@@ -59,12 +59,7 @@ func verifyOTP(c *gin.Context) {
 		"exp":   time.Now().Add(24 * time.Hour).Unix(),
 	})
 
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "kumbh2027secret"
-	}
-
-	tokenStr, err := token.SignedString([]byte(secret))
+	tokenStr, err := token.SignedString(jwtSecret())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
 		return
@@ -92,13 +87,8 @@ func authMiddleware() gin.HandlerFunc {
 			tokenStr = tokenStr[7:]
 		}
 
-		secret := os.Getenv("JWT_SECRET")
-		if secret == "" {
-			secret = "kumbh2027secret"
-		}
-
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-			return []byte(secret), nil
+			return jwtSecret(), nil
 		})
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

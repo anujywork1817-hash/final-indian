@@ -334,13 +334,13 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
     }
     setState(() => _isLoading = true);
     try {
-      final res = await ApiService.sendOTP(_phoneController.text);
+      await ApiService.sendOTP(_phoneController.text);
       if (!mounted) return;
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'OTP: ${res['otp']}',
+            'OTP sent to ${_phoneController.text}',
             style: GoogleFonts.poppins(color: Colors.white),
           ),
           backgroundColor: AppColors.saffronDark,
