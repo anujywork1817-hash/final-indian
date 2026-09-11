@@ -25,7 +25,7 @@ func startNoShowSweeper() {
 
 	time.Sleep(45 * time.Second) // let the service finish booting first
 	for {
-		sweepNoShows()
+		runIfLeader("no_show_sweeper", sweepNoShows)
 		time.Sleep(interval)
 	}
 }

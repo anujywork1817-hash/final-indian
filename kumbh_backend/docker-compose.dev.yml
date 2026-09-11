@@ -24,6 +24,24 @@ services:
       - ./migrations/002_missing_tables.sql:/docker-entrypoint-initdb.d/02_missing_tables.sql
       - ./migrations/003_refund_approval.sql:/docker-entrypoint-initdb.d/03_refund_approval.sql
       - ./migrations/004_cancellation_policy.sql:/docker-entrypoint-initdb.d/04_cancellation_policy.sql
+      # BUG-25: 005-015 existed as files but were never mounted, so a
+      # fresh dev DB (or a fresh RDS instance) never got the finance,
+      # payment-tracking, invoicing, ledger, RBAC/audit, vendor-payables
+      # or perf-index tables the Go code already queries — every one of
+      # these would 42P01 ("relation does not exist") on a clean deploy.
+      - ./migrations/005_finance_phase1.sql:/docker-entrypoint-initdb.d/05_finance_phase1.sql
+      - ./migrations/006_payment_tracking.sql:/docker-entrypoint-initdb.d/06_payment_tracking.sql
+      - ./migrations/007_expenses_multicurrency.sql:/docker-entrypoint-initdb.d/07_expenses_multicurrency.sql
+      - ./migrations/008_gateway_reconciliation.sql:/docker-entrypoint-initdb.d/08_gateway_reconciliation.sql
+      - ./migrations/009_invoicing.sql:/docker-entrypoint-initdb.d/09_invoicing.sql
+      - ./migrations/010_ledger_bank_reports.sql:/docker-entrypoint-initdb.d/10_ledger_bank_reports.sql
+      - ./migrations/011_rbac_audit.sql:/docker-entrypoint-initdb.d/11_rbac_audit.sql
+      - ./migrations/012_vendor_payables.sql:/docker-entrypoint-initdb.d/12_vendor_payables.sql
+      - ./migrations/013_refund_approval_reason.sql:/docker-entrypoint-initdb.d/13_refund_approval_reason.sql
+      - ./migrations/014_push_notifications.sql:/docker-entrypoint-initdb.d/14_push_notifications.sql
+      - ./migrations/015_perf_indexes.sql:/docker-entrypoint-initdb.d/15_perf_indexes.sql
+      - ./migrations/016_payment_integrity.sql:/docker-entrypoint-initdb.d/16_payment_integrity.sql
+      - ./migrations/017_rate_limits.sql:/docker-entrypoint-initdb.d/17_rate_limits.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -44,7 +62,7 @@ services:
       - TENT_SERVICE_URL=http://tent-service:8082
       - BOOKING_SERVICE_URL=http://booking-service:8083
       - PAYMENT_SERVICE_URL=http://payment-service:8084
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
     depends_on:
       - auth-service
       - tent-service
@@ -63,7 +81,7 @@ services:
     environment:
       - AUTH_SERVICE_PORT=8081
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,12 +116,12 @@ services:
     environment:
       - BOOKING_SERVICE_PORT=8083
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
       # Booking service issues refunds, so it needs Razorpay
       # credentials too — not just payment-service.
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
       # ── Refund policy ────────────────────────────────
       # Empty REFUND_TIERS = 100% refund at any notice.
       # See .env.example for the T&C-matching alternative.
@@ -143,9 +161,9 @@ services:
     environment:
       - PAYMENT_SERVICE_PORT=8084
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
       # ── Booking confirmation email ───────────────────
       - SMTP_HOST=${SMTP_HOST:-}

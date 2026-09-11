@@ -15,6 +15,7 @@ var db *sql.DB
 
 func main() {
 	godotenv.Load()
+	requireEnv("JWT_SECRET")
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -36,16 +37,7 @@ func main() {
 
 	r := gin.Default()
 
-	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	r.Use(corsMiddleware())
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {

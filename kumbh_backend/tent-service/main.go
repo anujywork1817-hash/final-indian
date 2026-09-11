@@ -17,6 +17,7 @@ var db *sql.DB
 
 func main() {
 	godotenv.Load()
+	requireEnv("JWT_SECRET")
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
@@ -47,16 +48,7 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	r.Use(corsMiddleware())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok", "service": "tent-service"})
@@ -73,10 +65,14 @@ func main() {
 	r.POST("/tents/:id/reviews", submitReview)
 	r.GET("/tents/:id/reviews", getReviews)
 
-	r.GET("/admin/tents", adminGetTents)
-	r.POST("/admin/tents", adminCreateTent)
-	r.PUT("/admin/tents/:id", adminUpdateTent)
-	r.DELETE("/admin/tents/:id", adminDeleteTent)
+	// BUG-15: every /admin/* route now requires its own valid admin
+	// JWT (requireAdmin, audit.go), not just api-gateway's adminGuard.
+	admin := r.Group("/admin")
+	admin.Use(requireAdmin())
+	admin.GET("/tents", adminGetTents)
+	admin.POST("/tents", adminCreateTent)
+	admin.PUT("/tents/:id", adminUpdateTent)
+	admin.DELETE("/tents/:id", adminDeleteTent)
 
 	port := os.Getenv("TENT_SERVICE_PORT")
 	if port == "" {
@@ -91,5 +87,5 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	log.Fatal(srv.ListenAndServe())
+	runGracefully(srv, "Tent Service")
 }

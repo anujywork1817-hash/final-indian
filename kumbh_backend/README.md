@@ -64,19 +64,24 @@ API base URL: **`http://localhost:18090/api/v1`**
 
 ### Database setup (one time)
 
-`run-local.ps1` expects a `kumbh_tent` database that has had all
-three SQL files applied, in order:
+`run-local.ps1` expects a `kumbh_tent` database that has had
+`schema.sql` and every file under `migrations/` applied, in order:
 
 ```bash
 psql -U postgres -h localhost -d kumbh_tent -f schema.sql
-psql -U postgres -h localhost -d kumbh_tent -f migrations/001_create_refunds.sql
-psql -U postgres -h localhost -d kumbh_tent -f migrations/002_missing_tables.sql
-psql -U postgres -h localhost -d kumbh_tent -f migrations/003_refund_approval.sql
+for f in migrations/*.sql; do
+  psql -U postgres -h localhost -d kumbh_tent -f "$f"
+done
 ```
 
 `002` is required — without it, admin login, reviews and KYC all
 fail, because those tables/columns appear in no other SQL file.
-`003` adds the refund approval gate.
+`003` adds the refund approval gate. `005`-`015` back the finance/
+P&L, payment-tracking, invoicing, ledger, RBAC/audit and
+vendor-payables features — skipping them makes those endpoints
+fail with a Postgres `42P01 relation does not exist` error (see
+BUG-25: they used to be applied nowhere, dev included — see
+`docker-compose.dev.yml`, which now mounts all of them).
 
 Seed an admin account so the panel can be used (bcrypt hash for
 `admin123`; generate your own for anything non-local):
@@ -354,18 +359,24 @@ booking, which is what the Cancellations screen renders.
 ### Migration
 
 ```bash
-psql "$DATABASE_URL" -f migrations/001_create_refunds.sql
+for f in migrations/*.sql; do
+  psql "$DATABASE_URL" -f "$f"
+done
 ```
 
-Idempotent — safe to run repeatedly. It creates `refunds` and
+Idempotent — safe to run repeatedly. `001` creates `refunds` and
 also adds two columns the services already used but that
 `schema.sql` never declared (`bookings.razorpay_order_id`,
-`users.fcm_token`).
+`users.fcm_token`); `005`-`015` back finance/P&L, payment
+tracking, invoicing, the ledger, RBAC/audit and vendor payables.
 
 There is no migration runner in this repo; migrations are
 applied by hand. `schema.sql` is only used to initialise a fresh
 local Postgres via docker-compose, so **a fresh local database
-needs the migration applied too**.
+needs every migration applied too** — `docker-compose.dev.yml`
+does this automatically for local Docker Postgres; a hand-rolled
+local `psql` setup or a fresh RDS instance does not, and must run
+the loop above.
 
 ### Tests
 

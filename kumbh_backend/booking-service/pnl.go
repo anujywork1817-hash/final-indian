@@ -65,75 +65,111 @@ func adminPnL(c *gin.Context) {
 		return r
 	}
 
+	// BUG-29: every one of these queries used to be `rows, _ :=
+	// db.Query(...)` — a failed query (a missing table because a
+	// migration was never applied, a bad connection, a query
+	// timeout) was silently treated as "no rows" and that whole
+	// line item came back as 0, not as an error. A P&L report that
+	// quietly reports Rs.0 refunds or Rs.0 expenses instead of
+	// failing looks like real, complete data — worse than an
+	// outright error, because nothing about the response says it's
+	// wrong. Every query below now aborts the request with a clear
+	// 500 on failure instead of pretending the period had no data.
+	fail := func(c *gin.Context, what string, err error) bool {
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("P&L report failed while computing %s: %v", what, err),
+			})
+			return true
+		}
+		return false
+	}
+
 	// Gross booking value per period.
-	rows, _ := db.Query(`
+	rows, err := db.Query(`
 		SELECT ` + bookingGroupExpr + `, COALESCE(SUM(b.total_amount), 0)
 		FROM bookings b WHERE b.status != 'cancelled' AND b.status != 'pending'
 		GROUP BY 1
 	`)
-	if rows != nil {
-		for rows.Next() {
-			var key string
-			var amount float64
-			if rows.Scan(&key, &amount) == nil {
-				get(key).GrossBookingValue = amount
-			}
-		}
-		rows.Close()
+	if fail(c, "gross booking value", err) {
+		return
 	}
+	for rows.Next() {
+		var key string
+		var amount float64
+		if err := rows.Scan(&key, &amount); err != nil {
+			rows.Close()
+			fail(c, "gross booking value", err)
+			return
+		}
+		get(key).GrossBookingValue = amount
+	}
+	rows.Close()
 
 	// Refunds (settled only) per period.
-	rows, _ = db.Query(`
+	rows, err = db.Query(`
 		SELECT ` + refundGroupExpr + `, COALESCE(SUM(r.refund_amount_paise), 0) / 100.0
 		FROM refunds r WHERE r.status = 'succeeded'
 		GROUP BY 1
 	`)
-	if rows != nil {
-		for rows.Next() {
-			var key string
-			var amount float64
-			if rows.Scan(&key, &amount) == nil {
-				get(key).Refunds = amount
-			}
-		}
-		rows.Close()
+	if fail(c, "refunds", err) {
+		return
 	}
+	for rows.Next() {
+		var key string
+		var amount float64
+		if err := rows.Scan(&key, &amount); err != nil {
+			rows.Close()
+			fail(c, "refunds", err)
+			return
+		}
+		get(key).Refunds = amount
+	}
+	rows.Close()
 
 	// Operating expenses (net of reversals — a reversal is already
 	// a negative row, so a plain SUM nets it out) per period.
-	rows, _ = db.Query(`
+	rows, err = db.Query(`
 		SELECT ` + expenseGroupExpr + `, COALESCE(SUM(e.amount + e.tax), 0)
 		FROM expenses e
 		GROUP BY 1
 	`)
-	if rows != nil {
-		for rows.Next() {
-			var key string
-			var amount float64
-			if rows.Scan(&key, &amount) == nil {
-				get(key).OperatingExpenses = amount
-			}
-		}
-		rows.Close()
+	if fail(c, "operating expenses", err) {
+		return
 	}
+	for rows.Next() {
+		var key string
+		var amount float64
+		if err := rows.Scan(&key, &amount); err != nil {
+			rows.Close()
+			fail(c, "operating expenses", err)
+			return
+		}
+		get(key).OperatingExpenses = amount
+	}
+	rows.Close()
 
 	// Gateway charges (Razorpay fee + tax on fee) per period.
-	rows, _ = db.Query(`
+	rows, err = db.Query(`
 		SELECT ` + paymentGroupExpr + `, p.payment_mode, COALESCE(SUM(p.amount), 0)
 		FROM payments p WHERE p.status = 'success'
 		GROUP BY 1, 2
 	`)
-	if rows != nil {
-		for rows.Next() {
-			var key, gateway string
-			var gross float64
-			if rows.Scan(&key, &gateway, &gross) == nil {
-				feePaise := gatewayFeePaiseFor(gateway, int64(gross*100+0.5))
-				get(key).GatewayCharges += float64(feePaise) / 100.0
-			}
-		}
-		rows.Close()
+	if fail(c, "gateway charges", err) {
+		return
 	}
+	for rows.Next() {
+		var key, gateway string
+		var gross float64
+		if err := rows.Scan(&key, &gateway, &gross); err != nil {
+			rows.Close()
+			fail(c, "gateway charges", err)
+			return
+		}
+		feePaise := gatewayFeePaiseFor(gateway, int64(gross*100+0.5))
+		get(key).GatewayCharges += float64(feePaise) / 100.0
+	}
+	rows.Close()
 
 	result := make([]row, 0, len(order))
 	for _, key := range order {
@@ -192,7 +228,20 @@ func adminGSTReport(c *gin.Context) {
 		return r
 	}
 
-	rows, _ := db.Query(`
+	// BUG-29: same rule as adminPnL above — a failed query must fail
+	// the report, not silently render as an all-zero period in a GST
+	// filing number.
+	fail := func(c *gin.Context, what string, err error) bool {
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": fmt.Sprintf("GST report failed while computing %s: %v", what, err),
+			})
+			return true
+		}
+		return false
+	}
+
+	rows, err := db.Query(`
 		SELECT ` + bookingGroupExpr + `,
 		       COALESCE(SUM(b.base_amount - b.discount), 0),
 		       COALESCE(SUM(b.tax), 0),
@@ -200,38 +249,46 @@ func adminGSTReport(c *gin.Context) {
 		FROM bookings b WHERE b.status != 'cancelled' AND b.status != 'pending'
 		GROUP BY 1
 	`)
-	if rows != nil {
-		for rows.Next() {
-			var key string
-			var taxable, gst float64
-			var foreignCount int
-			if rows.Scan(&key, &taxable, &gst, &foreignCount) == nil {
-				r := get(key)
-				r.TaxableValue = taxable
-				r.GSTCollected = gst
-				r.CGST = gst / 2
-				r.SGST = gst / 2
-				r.ForeignBookingCount = foreignCount
-			}
-		}
-		rows.Close()
+	if fail(c, "GST collected", err) {
+		return
 	}
+	for rows.Next() {
+		var key string
+		var taxable, gst float64
+		var foreignCount int
+		if err := rows.Scan(&key, &taxable, &gst, &foreignCount); err != nil {
+			rows.Close()
+			fail(c, "GST collected", err)
+			return
+		}
+		r := get(key)
+		r.TaxableValue = taxable
+		r.GSTCollected = gst
+		r.CGST = gst / 2
+		r.SGST = gst / 2
+		r.ForeignBookingCount = foreignCount
+	}
+	rows.Close()
 
-	rows, _ = db.Query(`
+	rows, err = db.Query(`
 		SELECT ` + expenseGroupExpr + `, COALESCE(SUM(e.tax), 0)
 		FROM expenses e
 		GROUP BY 1
 	`)
-	if rows != nil {
-		for rows.Next() {
-			var key string
-			var itc float64
-			if rows.Scan(&key, &itc) == nil {
-				get(key).InputTaxCredit = itc
-			}
-		}
-		rows.Close()
+	if fail(c, "input tax credit", err) {
+		return
 	}
+	for rows.Next() {
+		var key string
+		var itc float64
+		if err := rows.Scan(&key, &itc); err != nil {
+			rows.Close()
+			fail(c, "input tax credit", err)
+			return
+		}
+		get(key).InputTaxCredit = itc
+	}
+	rows.Close()
 
 	result := make([]row, 0, len(order))
 	for _, key := range order {

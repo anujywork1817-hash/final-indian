@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"strings"
@@ -16,6 +15,7 @@ import (
 
 func main() {
 	godotenv.Load()
+	requireEnv("JWT_SECRET")
 
 	authURL := os.Getenv("AUTH_SERVICE_URL")
 	tentURL := os.Getenv("TENT_SERVICE_URL")
@@ -39,16 +39,10 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	r.Use(func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type,Authorization")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	r.Use(corsMiddleware())
+	// BUG-14: every /api/v1/admin/* (and /api/v1/auth/admin/* except
+	// login) now requires a valid admin-role JWT at the gateway.
+	r.Use(adminGuard())
 
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -254,7 +248,7 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	log.Fatal(srv.ListenAndServe())
+	runGracefully(srv, "API Gateway")
 }
 
 // Shared transport across all proxy() clients: the default http.Transport
@@ -280,7 +274,20 @@ func proxy(target string) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "proxy error"})
 			return
 		}
-		req.Header.Set("Content-Type", "application/json")
+		// BUG (gateway Content-Type): this used to hardcode
+		// "application/json" on every proxied request regardless of
+		// what the client actually sent, silently relabeling any
+		// multipart/form-data upload, an octet-stream body, or a
+		// client that already set its own charset/boundary. Forward
+		// the client's real Content-Type and only default to JSON
+		// when the client didn't send one at all (e.g. a bodyless
+		// GET/DELETE) — everything downstream already assumes JSON
+		// in that case.
+		if ct := c.GetHeader("Content-Type"); ct != "" {
+			req.Header.Set("Content-Type", ct)
+		} else {
+			req.Header.Set("Content-Type", "application/json")
+		}
 		if auth := c.GetHeader("Authorization"); auth != "" {
 			req.Header.Set("Authorization", auth)
 		}
@@ -321,15 +328,11 @@ func jwtMiddleware() gin.HandlerFunc {
 		if len(tokenStr) > 7 && tokenStr[:7] == "Bearer " {
 			tokenStr = tokenStr[7:]
 		}
-		secret := os.Getenv("JWT_SECRET")
-		if secret == "" {
-			secret = "kumbh2027secret"
-		}
 		token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("unexpected signing method")
 			}
-			return []byte(secret), nil
+			return jwtSecret(), nil
 		})
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})

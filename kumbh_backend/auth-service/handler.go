@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
@@ -22,7 +21,14 @@ func sendOTP(c *gin.Context) {
 		return
 	}
 
-	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	// BUG-21: cap how often one phone number can trigger a send —
+	// otherwise this endpoint is an open SMS bomb against any number.
+	if rateLimitExceeded("send-otp:"+req.Phone, 5, 15*time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many OTP requests, try again later"})
+		return
+	}
+
+	otp := secureNumericCode(6)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
 	_, err := db.Exec(`
@@ -37,12 +43,16 @@ func sendOTP(c *gin.Context) {
 		return
 	}
 
-	fmt.Printf("OTP for %s: %s\n", req.Phone, otp)
+	// The OTP must only ever leave the server via the SMS/notification
+	// channel. Never in the HTTP response, and only in logs when
+	// explicitly opted in for local debugging.
+	if os.Getenv("OTP_DEBUG") == "true" {
+		fmt.Printf("[OTP_DEBUG] %s -> %s\n", req.Phone, otp)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "OTP sent successfully",
 		"phone":   req.Phone,
-		"otp":     otp,
 	})
 }
 
@@ -53,6 +63,14 @@ func verifyOTP(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// BUG-21: a 6-digit OTP is only 1,000,000 possibilities — cap
+	// verify attempts per phone so it can't be brute-forced within
+	// its 5-minute validity window.
+	if rateLimitExceeded("verify-otp:"+req.Phone, 5, 15*time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many attempts, request a new OTP"})
 		return
 	}
 
@@ -96,18 +114,13 @@ func verifyOTP(c *gin.Context) {
 		FROM users WHERE phone = $1
 	`, req.Phone).Scan(&name, &email, &role)
 
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "kumbh2027secret"
-	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"phone": req.Phone,
 		"role":  role,
 		"exp":   time.Now().Add(30 * 24 * time.Hour).Unix(),
 	})
 
-	tokenStr, err := token.SignedString([]byte(secret))
+	tokenStr, err := token.SignedString(jwtSecret())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
 		return
@@ -271,6 +284,16 @@ func adminLogin(c *gin.Context) {
 		return
 	}
 
+	// BUG-21: cap admin login attempts, both per-username (a
+	// targeted password guess against one account) and per-IP (one
+	// attacker spraying many usernames) — either exceeding its cap
+	// blocks the request.
+	if rateLimitExceeded("admin-login:user:"+req.Username, 5, 15*time.Minute) ||
+		rateLimitExceeded("admin-login:ip:"+c.ClientIP(), 20, 15*time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many login attempts, try again later"})
+		return
+	}
+
 	// Find admin in DB
 	var passwordHash, role string
 	err := db.QueryRow(`SELECT password_hash, role FROM admins WHERE username = $1`, req.Username).Scan(&passwordHash, &role)
@@ -287,18 +310,13 @@ func adminLogin(c *gin.Context) {
 	}
 
 	// Generate JWT token
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "kumbh2027secret"
-	}
-
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"username": req.Username,
 		"role":     role,
 		"exp":      time.Now().Add(24 * time.Hour).Unix(),
 	})
 
-	tokenStr, err := token.SignedString([]byte(secret))
+	tokenStr, err := token.SignedString(jwtSecret())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "token error"})
 		return
