@@ -48,7 +48,17 @@ const Color kDark = kLuxDark;
 // same network — for access from outside, that server needs a
 // domain + reverse proxy (see the deployment notes) and this
 // should be swapped to that URL instead.
-const String kBaseUrl = 'http://bharat-tent-api-prod.eba-umvanuqr.ap-south-1.elasticbeanstalk.com/api/v1';
+//
+// HTTPS/config fix: this used to point straight at the EB
+// environment's own http:// hostname — every auth token, OTP,
+// phone number, KYC id_proof string and Razorpay payment
+// confirmation went out over plain HTTP. d3b3txz2trpjza.cloudfront.net
+// is a CloudFront distribution (E3IO9VQZI4BZSB, ap-south-1 account
+// 156777722750) put in front of bharat-tent-api-prod purely for TLS
+// termination — origin protocol policy is http-only (the EB env
+// itself still has no cert), caching is disabled, and all headers/
+// methods/query strings pass through unmodified.
+const String kBaseUrl = 'https://d3b3txz2trpjza.cloudfront.net/api/v1';
 
 // Local Docker Compose on this PC — plain http, not https: the
 // local gateway serves no TLS. localhost works because the phone
@@ -59,9 +69,9 @@ const String kBaseUrl = 'http://bharat-tent-api-prod.eba-umvanuqr.ap-south-1.ela
 //   physical device over Wi-Fi -> http://192.168.1.40:18090/api/v1
 //   Android emulator           -> http://10.0.2.2:18090/api/v1
 
-// Production / staging — swap in as needed.
-//const String kBaseUrl = 'https://d3dmb495g7jwhi.cloudfront.net/api/v1';
-//const String kBaseUrl = 'http://myapp-backend-env-1.eba-njsam29m.ap-south-1.elasticbeanstalk.com/api/v1';
+// Direct EB origin (no TLS) — only for debugging the CloudFront
+// distribution itself; never point the shipped app at this.
+//const String kBaseUrl = 'http://bharat-tent-api-prod.eba-umvanuqr.ap-south-1.elasticbeanstalk.com/api/v1';
 
 // ── Storage Keys ─────────────────────────────────────────
 const String kAuthToken = 'auth_token';
