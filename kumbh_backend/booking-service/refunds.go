@@ -367,7 +367,7 @@ func startRefundRetryWorker() {
 	time.Sleep(30 * time.Second)
 
 	for {
-		retryPendingRefunds()
+		runIfLeader("refund_retry_worker", retryPendingRefunds)
 		time.Sleep(interval)
 	}
 }

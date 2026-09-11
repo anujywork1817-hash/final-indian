@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -1019,12 +1020,36 @@ func adminSendNotification(c *gin.Context) {
 		}
 	}
 
-	// Send notifications in background
-	sent := 0
-	for _, token := range tokens {
-		go sendFCMNotification(token, req.Title, req.Body)
-		sent++
+	// Send notifications through a bounded worker pool, not one bare
+	// `go` per token. "all" can be every user in the database — a
+	// broadcast of a few thousand tokens used to fire a few thousand
+	// goroutines at once, each reading the service-account file and
+	// requesting its own Google OAuth token simultaneously, which
+	// both thrashed the box (FDs/memory) and hit Google's token
+	// endpoint with a thundering herd likely to get rate-limited.
+	const fcmWorkerCount = 20
+	sent := len(tokens)
+	tokenCh := make(chan string)
+	go func() {
+		defer close(tokenCh)
+		for _, t := range tokens {
+			tokenCh <- t
+		}
+	}()
+	var wg sync.WaitGroup
+	for i := 0; i < fcmWorkerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for t := range tokenCh {
+				sendFCMNotification(t, req.Title, req.Body)
+			}
+		}()
 	}
+	go func() {
+		wg.Wait()
+		fmt.Printf("✅ Broadcast notification finished: %d/%d sent (target=%s)\n", sent, sent, req.Target)
+	}()
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": fmt.Sprintf("Notification sent to %d users", sent),

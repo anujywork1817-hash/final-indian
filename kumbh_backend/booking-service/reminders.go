@@ -85,7 +85,17 @@ func sendFCMNotification(fcmToken, title, body string) {
 
 	respBody, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode == 200 {
-		fmt.Printf("✅ FCM reminder sent to token: %s...\n", fcmToken[:20])
+		// BUG: fcmToken[:20] panicked (slice bounds out of range) for
+		// any token shorter than 20 bytes — a malformed/placeholder
+		// token saved by a buggy client, or a short dev/test token.
+		// This runs inside a bare `go sendFCMNotification(...)` call
+		// site with no recover(), so the panic took down the whole
+		// process, not just this goroutine.
+		logToken := fcmToken
+		if len(logToken) > 20 {
+			logToken = logToken[:20]
+		}
+		fmt.Printf("✅ FCM reminder sent to token: %s...\n", logToken)
 	} else {
 		fmt.Printf("⚠️ FCM reminder failed: %s\n", string(respBody))
 	}

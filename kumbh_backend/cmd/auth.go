@@ -5,13 +5,25 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var otpStore = map[string]string{}
+// BUG (monolith mutex): otpStore is a plain map read/written from
+// sendOTP and verifyOTP, both HTTP handlers — gin serves each
+// request on its own goroutine, so two OTP requests arriving at once
+// (routine during a login burst) raced on this map. A concurrent
+// read+write on a Go map is not merely undefined behaviour, it is a
+// runtime-detected fatal error ("fatal error: concurrent map read
+// and map write") that crashes the whole process — unrecoverable,
+// even with a recover() in place. otpMu serializes all access.
+var (
+	otpStore = map[string]string{}
+	otpMu    sync.Mutex
+)
 
 func sendOTP(c *gin.Context) {
 	var req struct {
@@ -23,7 +35,9 @@ func sendOTP(c *gin.Context) {
 	}
 
 	otp := fmt.Sprintf("%06d", rand.Intn(1000000))
+	otpMu.Lock()
 	otpStore[req.Phone] = otp
+	otpMu.Unlock()
 
 	// In production: send via SMS gateway
 	fmt.Printf("OTP for %s: %s\n", req.Phone, otp)
@@ -46,13 +60,16 @@ func verifyOTP(c *gin.Context) {
 		return
 	}
 
+	otpMu.Lock()
 	stored, exists := otpStore[req.Phone]
+	if exists && stored == req.OTP {
+		delete(otpStore, req.Phone)
+	}
+	otpMu.Unlock()
 	if !exists || stored != req.OTP {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid OTP"})
 		return
 	}
-
-	delete(otpStore, req.Phone)
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"phone": req.Phone,
