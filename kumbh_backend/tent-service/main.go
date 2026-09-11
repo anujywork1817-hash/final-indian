@@ -65,10 +65,14 @@ func main() {
 	r.POST("/tents/:id/reviews", submitReview)
 	r.GET("/tents/:id/reviews", getReviews)
 
-	r.GET("/admin/tents", adminGetTents)
-	r.POST("/admin/tents", adminCreateTent)
-	r.PUT("/admin/tents/:id", adminUpdateTent)
-	r.DELETE("/admin/tents/:id", adminDeleteTent)
+	// BUG-15: every /admin/* route now requires its own valid admin
+	// JWT (requireAdmin, audit.go), not just api-gateway's adminGuard.
+	admin := r.Group("/admin")
+	admin.Use(requireAdmin())
+	admin.GET("/tents", adminGetTents)
+	admin.POST("/tents", adminCreateTent)
+	admin.PUT("/tents/:id", adminUpdateTent)
+	admin.DELETE("/tents/:id", adminDeleteTent)
 
 	port := os.Getenv("TENT_SERVICE_PORT")
 	if port == "" {

@@ -63,6 +63,36 @@ func requireSuperAdmin() gin.HandlerFunc {
 	}
 }
 
+// adminRoles mirrors api-gateway/security.go's allowlist.
+var adminRoles = map[string]bool{"super_admin": true, "admin": true, "staff": true}
+
+// requireAdmin gates every /admin/* route in this service on a
+// valid admin JWT of its own, independent of api-gateway's
+// adminGuard.
+//
+// BUG-15: only the four money-moving actions above ever checked
+// anything at this layer — every other /admin/* route (coupons,
+// bookings, the finance/P&L/GST/ledger/invoice reports, the
+// broadcast-notification endpoint) had zero auth at the
+// booking-service level. That is safe ONLY as long as nothing can
+// reach booking-service except through the gateway; this service is
+// reachable on its own port in local/dev (docker-compose.dev.yml)
+// and there is nothing architecturally stopping the same being true
+// in production if the gateway is ever bypassed, misconfigured, or
+// a route added here without also adding it to the gateway. Each
+// service must not depend on an upstream hop it cannot verify.
+func requireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_, role := adminRoleFromToken(c)
+		if !adminRoles[role] {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "admin authentication required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func logAdminAction(admin, action, targetType, targetID, details string) {
 	db.Exec(`
 		INSERT INTO admin_audit_log (admin_username, action, target_type, target_id, details)

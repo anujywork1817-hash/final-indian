@@ -14,7 +14,7 @@ import (
 
 // createRazorpayOrder calls Razorpay Orders API and returns the order ID to Flutter
 func createRazorpayOrder(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return

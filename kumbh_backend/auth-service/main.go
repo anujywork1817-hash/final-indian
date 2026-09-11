@@ -64,10 +64,14 @@ func main() {
 	r.POST("/auth/admin/change-username", adminChangeUsername)
 	r.GET("/auth/admin/list", requireSuperAdmin(), adminListAdmins)
 	r.POST("/auth/admin/create", requireSuperAdmin(), adminCreateAdmin)
-	r.GET("/admin/users", adminGetUsers)
-	r.PUT("/admin/users/:phone/block", adminBlockUser)
-	r.GET("/admin/kyc", adminGetKYC)
-	r.PUT("/admin/kyc/:phone/verify", adminVerifyKYC)
+	// BUG-15: every /admin/* route now requires its own valid admin
+	// JWT (requireAdmin, rbac.go), not just api-gateway's adminGuard.
+	admin := r.Group("/admin")
+	admin.Use(requireAdmin())
+	admin.GET("/users", adminGetUsers)
+	admin.PUT("/users/:phone/block", adminBlockUser)
+	admin.GET("/kyc", adminGetKYC)
+	admin.PUT("/kyc/:phone/verify", adminVerifyKYC)
 
 	port := os.Getenv("AUTH_SERVICE_PORT")
 	if port == "" {

@@ -408,7 +408,7 @@ func retryPendingRefunds() {
 // getBookingRefund returns the refund for one of the caller's
 // own bookings.  GET /bookings/:ref/refund
 func getBookingRefund(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -434,7 +434,7 @@ func getBookingRefund(c *gin.Context) {
 // UI can state the amount BEFORE the user confirms.
 // GET /bookings/:ref/refund-quote
 func getRefundQuote(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return

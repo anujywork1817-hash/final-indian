@@ -24,6 +24,7 @@ services:
       - ./migrations/002_missing_tables.sql:/docker-entrypoint-initdb.d/02_missing_tables.sql
       - ./migrations/003_refund_approval.sql:/docker-entrypoint-initdb.d/03_refund_approval.sql
       - ./migrations/004_cancellation_policy.sql:/docker-entrypoint-initdb.d/04_cancellation_policy.sql
+      - ./migrations/017_rate_limits.sql:/docker-entrypoint-initdb.d/17_rate_limits.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s

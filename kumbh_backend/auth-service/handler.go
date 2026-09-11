@@ -21,6 +21,13 @@ func sendOTP(c *gin.Context) {
 		return
 	}
 
+	// BUG-21: cap how often one phone number can trigger a send —
+	// otherwise this endpoint is an open SMS bomb against any number.
+	if rateLimitExceeded("send-otp:"+req.Phone, 5, 15*time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many OTP requests, try again later"})
+		return
+	}
+
 	otp := secureNumericCode(6)
 	expiresAt := time.Now().Add(5 * time.Minute)
 
@@ -56,6 +63,14 @@ func verifyOTP(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// BUG-21: a 6-digit OTP is only 1,000,000 possibilities — cap
+	// verify attempts per phone so it can't be brute-forced within
+	// its 5-minute validity window.
+	if rateLimitExceeded("verify-otp:"+req.Phone, 5, 15*time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many attempts, request a new OTP"})
 		return
 	}
 
@@ -266,6 +281,16 @@ func adminLogin(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "username and password required"})
+		return
+	}
+
+	// BUG-21: cap admin login attempts, both per-username (a
+	// targeted password guess against one account) and per-IP (one
+	// attacker spraying many usernames) — either exceeding its cap
+	// blocks the request.
+	if rateLimitExceeded("admin-login:user:"+req.Username, 5, 15*time.Minute) ||
+		rateLimitExceeded("admin-login:ip:"+c.ClientIP(), 20, 15*time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many login attempts, try again later"})
 		return
 	}
 

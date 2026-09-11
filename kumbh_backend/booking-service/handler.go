@@ -47,7 +47,7 @@ type Booking struct {
 }
 
 func createBooking(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -282,7 +282,7 @@ func createBooking(c *gin.Context) {
 }
 
 func myBookings(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -370,7 +370,7 @@ func myBookings(c *gin.Context) {
 // 'failed' and is retried by the background worker, so money
 // owed is never silently dropped.
 func cancelBooking(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -675,7 +675,7 @@ func listCoupons(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"coupons": coupons})
 }
 func deleteBooking(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	ref := c.Param("ref")
 
 	// Only allow deleting cancelled bookings
