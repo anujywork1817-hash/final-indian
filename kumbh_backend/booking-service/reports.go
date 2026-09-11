@@ -306,9 +306,23 @@ func renderReportPDF(table *reportTable) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+// truncateForPDF shortens s to at most n characters, appending an
+// ellipsis if it had to cut anything.
+//
+// BUG: this used to count and slice by byte length (`len(s)`,
+// `s[:n-1]`). Guest names and addresses in this app are routinely
+// non-ASCII (Devanagari, accented Latin, emoji), where one character
+// can be 2-4 bytes — a byte-index cut lands mid-rune, producing
+// truncated/invalid UTF-8 that renders as mojibake or a replacement
+// glyph (�) in the exported PDF report. Counting runes instead of
+// bytes always cuts on a character boundary.
 func truncateForPDF(s string, n int) string {
-	if len(s) <= n {
+	r := []rune(s)
+	if len(r) <= n {
 		return s
 	}
-	return s[:n-1] + "…"
+	if n <= 0 {
+		return ""
+	}
+	return string(r[:n-1]) + "…"
 }

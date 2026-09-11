@@ -178,7 +178,7 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	log.Fatal(srv.ListenAndServe())
+	runGracefully(srv, "Booking Service")
 }
 
 func startReminderScheduler() {
@@ -192,7 +192,9 @@ func startReminderScheduler() {
 		waitDuration := time.Until(next)
 		fmt.Printf("⏰ Next reminder run in: %s\n", waitDuration.Round(time.Minute))
 		time.Sleep(waitDuration)
-		sendBookingReminders()
-		runNotificationJobs()
+		runIfLeader("reminder_scheduler", func() {
+			sendBookingReminders()
+			runNotificationJobs()
+		})
 	}
 }

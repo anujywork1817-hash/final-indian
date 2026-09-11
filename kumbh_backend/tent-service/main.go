@@ -87,5 +87,5 @@ func main() {
 		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       120 * time.Second,
 	}
-	log.Fatal(srv.ListenAndServe())
+	runGracefully(srv, "Tent Service")
 }

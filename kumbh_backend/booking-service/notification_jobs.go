@@ -293,7 +293,7 @@ func startNewsPoller() {
 		// Small delay so it does not compete with startup work.
 		time.Sleep(2 * time.Minute)
 		for {
-			pollKumbhNews()
+			runIfLeader("news_poller", pollKumbhNews)
 			time.Sleep(1 * time.Hour)
 		}
 	}()
