@@ -53,11 +53,21 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String _authToken = '';
 
   static const _storage = FlutterSecureStorage();
-  // Must match RAZORPAY_KEY_ID on the backend — the SDK here opens
-  // checkout with this key, the order was created server-side with
-  // the same account's key, and a mismatch fails immediately with a
-  // generic "Payment Failed" (no useful detail from Razorpay's SDK).
-  static const String _razorpayKey = 'rzp_test_TZnmTJ5wGDBox2';
+  // Razorpay publishable Key ID. Provide it at build time with
+  //   flutter build apk --dart-define=RAZORPAY_KEY_ID=rzp_...
+  // so the credential isn't committed to source. It MUST match
+  // RAZORPAY_KEY_ID on the backend — the SDK opens checkout with
+  // this key while the order was created server-side with the same
+  // account's key, and a mismatch fails immediately with a generic
+  // "Payment Failed".
+  //
+  // A test-mode default is kept so existing builds keep working; CI
+  // should always pass the define and this fallback should be dropped
+  // once that's in place (BUG-19).
+  static const String _razorpayKey = String.fromEnvironment(
+    'RAZORPAY_KEY_ID',
+    defaultValue: 'rzp_test_TZnmTJ5wGDBox2',
+  );
 
   int get _nights => widget.checkOut.difference(widget.checkIn).inDays;
 

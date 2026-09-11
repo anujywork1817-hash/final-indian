@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -23,12 +22,8 @@ func adminUsernameFromToken(c *gin.Context) string {
 	if tokenStr == "" {
 		return ""
 	}
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "kumbh2027secret"
-	}
 	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-		return []byte(secret), nil
+		return jwtSecret(), nil
 	})
 	if err != nil || !token.Valid {
 		return ""

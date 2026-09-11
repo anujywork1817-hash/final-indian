@@ -111,11 +111,10 @@ func verifyPayment(c *gin.Context) {
 		return
 	}
 
-	// Verify Razorpay signature
+	// Verify Razorpay signature. RAZORPAY_KEY_SECRET is verified at
+	// startup (requireEnv in main), so there is no fallback here — a
+	// missing secret must never silently degrade signature checking.
 	secret := os.Getenv("RAZORPAY_KEY_SECRET")
-	if secret == "" {
-		secret = "test_secret"
-	}
 
 	payload := req.RazorpayOrderID + "|" + req.RazorpayPaymentID
 	mac := hmac.New(sha256.New, []byte(secret))

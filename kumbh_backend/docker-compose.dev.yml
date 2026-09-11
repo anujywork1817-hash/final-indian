@@ -44,7 +44,7 @@ services:
       - TENT_SERVICE_URL=http://tent-service:8082
       - BOOKING_SERVICE_URL=http://booking-service:8083
       - PAYMENT_SERVICE_URL=http://payment-service:8084
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
     depends_on:
       - auth-service
       - tent-service
@@ -63,7 +63,7 @@ services:
     environment:
       - AUTH_SERVICE_PORT=8081
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,12 +98,12 @@ services:
     environment:
       - BOOKING_SERVICE_PORT=8083
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
       # Booking service issues refunds, so it needs Razorpay
       # credentials too — not just payment-service.
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
       # ── Refund policy ────────────────────────────────
       # Empty REFUND_TIERS = 100% refund at any notice.
       # See .env.example for the T&C-matching alternative.
@@ -143,9 +143,9 @@ services:
     environment:
       - PAYMENT_SERVICE_PORT=8084
       - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
-      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
-      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
-      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-}
+      - JWT_SECRET=${JWT_SECRET:-dev-only-insecure-secret}
       - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
       # ── Booking confirmation email ───────────────────
       - SMTP_HOST=${SMTP_HOST:-}
