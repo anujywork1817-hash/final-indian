@@ -81,6 +81,28 @@ func requireSuperAdmin() gin.HandlerFunc {
 	}
 }
 
+// requireAdmin gates every /admin/* route in this service on a
+// valid admin JWT of its own, independent of api-gateway's
+// adminGuard.
+//
+// BUG-15: adminGetUsers/adminBlockUser/adminGetKYC/adminVerifyKYC
+// had no auth check at this layer at all — PII (phone numbers, KYC
+// documents) and the ability to block a user's account were reachable
+// by anyone who could reach auth-service directly. Only 'super_admin'
+// and 'staff' exist in this service's data model (see the comment
+// above adminRoleFromToken) — no third 'admin' role here.
+func requireAdmin() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_, role := adminRoleFromToken(c)
+		if role != "super_admin" && role != "staff" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "admin authentication required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // GET /auth/admin/list — super_admin only, via requireSuperAdmin
 // on the route. Never returns password hashes.
 func adminListAdmins(c *gin.Context) {

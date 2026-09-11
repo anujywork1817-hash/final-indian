@@ -94,7 +94,7 @@ func sendFCMNotification(fcmToken, title, body string) {
 }
 
 func verifyPayment(c *gin.Context) {
-	phone := c.GetHeader("X-User-Phone")
+	phone := verifiedPhone(c)
 	if phone == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return

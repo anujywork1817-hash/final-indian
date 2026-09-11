@@ -3,7 +3,6 @@ package main
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -14,12 +13,22 @@ import (
 // an in-memory Set that did not survive an app restart and was
 // invisible to the backend. Persisting it is what makes favourite
 // notifications (price drop, running low) possible at all.
+//
+// BUG-24: every handler below used to take `phone` from the
+// caller-supplied query string or JSON body and use it directly —
+// there was no check that it was actually the caller's own number.
+// Passing someone else's phone number (no valid session needed at
+// all, since it was read before any auth check) let anyone read,
+// add to, or clear another user's favourites and snan reminders —
+// a straightforward IDOR. Every handler now derives phone from the
+// caller's own verified JWT (verifiedPhone, identity.go) and a
+// caller-supplied phone/query param, if present, is ignored.
 
-// GET /favourites?phone=
+// GET /favourites
 func listFavourites(c *gin.Context) {
-	phone := strings.TrimSpace(c.Query("phone"))
+	phone := verifiedPhone(c)
 	if phone == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "phone is required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
@@ -66,11 +75,16 @@ func listFavourites(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"favourites": out, "total": len(out)})
 }
 
-// POST /favourites  {phone, tent_id}
+// POST /favourites  {tent_id}
 func addFavourite(c *gin.Context) {
+	phone := verifiedPhone(c)
+	if phone == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var body struct {
-		Phone  string `json:"phone" binding:"required"`
-		TentID int    `json:"tent_id" binding:"required"`
+		TentID int `json:"tent_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -82,7 +96,7 @@ func addFavourite(c *gin.Context) {
 	_, err := db.Exec(`
 		INSERT INTO favourites (phone, tent_id) VALUES ($1,$2)
 		ON CONFLICT (phone, tent_id) DO NOTHING
-	`, strings.TrimSpace(body.Phone), body.TentID)
+	`, phone, body.TentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to add favourite: " + err.Error()})
 		return
@@ -90,12 +104,16 @@ func addFavourite(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Added to favourites", "tent_id": body.TentID})
 }
 
-// DELETE /favourites/:tentId?phone=
+// DELETE /favourites/:tentId
 func removeFavourite(c *gin.Context) {
-	phone := strings.TrimSpace(c.Query("phone"))
+	phone := verifiedPhone(c)
+	if phone == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	tentID, err := strconv.Atoi(c.Param("tentId"))
-	if phone == "" || err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "phone and a numeric tent id are required"})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "a numeric tent id is required"})
 		return
 	}
 	db.Exec(`DELETE FROM favourites WHERE phone = $1 AND tent_id = $2`, phone, tentID)
@@ -104,12 +122,15 @@ func removeFavourite(c *gin.Context) {
 
 // ── Snan calendar + reminders ────────────────────────────
 
-// GET /snan-events?phone=
-// phone is optional; when present each event carries whether this
-// user has a reminder set, so the app can render the bell state in
-// one round trip.
+// GET /snan-events
+// Authentication is optional here — the calendar itself is public.
+// When the caller has a valid session, each event also carries
+// whether *they* have a reminder set, so the app can render the
+// bell state in one round trip. An unauthenticated (or invalid-
+// token) request just gets reminder_set=false on every event,
+// never another user's state.
 func listSnanEvents(c *gin.Context) {
-	phone := strings.TrimSpace(c.Query("phone"))
+	phone := verifiedPhone(c)
 
 	rows, err := db.Query(`
 		SELECT e.event_date::text, e.name, COALESCE(e.significance,''),
@@ -145,11 +166,16 @@ func listSnanEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"events": out, "total": len(out)})
 }
 
-// POST /snan-reminders  {phone, date}
+// POST /snan-reminders  {date}
 func addSnanReminder(c *gin.Context) {
+	phone := verifiedPhone(c)
+	if phone == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var body struct {
-		Phone string `json:"phone" binding:"required"`
-		Date  string `json:"date" binding:"required"`
+		Date string `json:"date" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -161,7 +187,7 @@ func addSnanReminder(c *gin.Context) {
 	_, err := db.Exec(`
 		INSERT INTO snan_reminders (phone, event_date) VALUES ($1,$2::date)
 		ON CONFLICT (phone, event_date) DO NOTHING
-	`, strings.TrimSpace(body.Phone), body.Date)
+	`, phone, body.Date)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "could not set reminder (is that a valid snan date?): " + err.Error()})
 		return
@@ -169,12 +195,16 @@ func addSnanReminder(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Reminder set", "date": body.Date})
 }
 
-// DELETE /snan-reminders/:date?phone=
+// DELETE /snan-reminders/:date
 func removeSnanReminder(c *gin.Context) {
-	phone := strings.TrimSpace(c.Query("phone"))
+	phone := verifiedPhone(c)
+	if phone == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	date := c.Param("date")
-	if phone == "" || date == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "phone and date are required"})
+	if date == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "date is required"})
 		return
 	}
 	db.Exec(`DELETE FROM snan_reminders WHERE phone = $1 AND event_date = $2::date`, phone, date)
