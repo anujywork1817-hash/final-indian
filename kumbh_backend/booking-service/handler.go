@@ -77,6 +77,26 @@ func createBooking(c *gin.Context) {
 		req.Units = 1
 	}
 
+	// ── BUG-12: validate dates up front ──────────────────────
+	// time.Parse errors were previously discarded (`checkIn, _ :=`),
+	// so a malformed date silently produced a zero time and a booking
+	// for year 1. Also reject stays that start in the past.
+	checkIn, errIn := time.Parse("2006-01-02", req.CheckIn)
+	checkOut, errOut := time.Parse("2006-01-02", req.CheckOut)
+	if errIn != nil || errOut != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "check_in and check_out must be YYYY-MM-DD dates"})
+		return
+	}
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	if checkIn.Before(today) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "check-in date is in the past"})
+		return
+	}
+	if !checkOut.After(checkIn) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "check-out must be after check-in"})
+		return
+	}
+
 	guestName := ""
 	guestPhone := ""
 	idProof := ""
@@ -168,22 +188,31 @@ func createBooking(c *gin.Context) {
 		return
 	}
 
-	// ── Step 4: Calculate dates and amounts ───────────────────
-	checkIn, _ := time.Parse("2006-01-02", req.CheckIn)
-	checkOut, _ := time.Parse("2006-01-02", req.CheckOut)
+	// ── Step 4: Calculate amounts (server is the source of truth) ─
 	nights := int(checkOut.Sub(checkIn).Hours() / 24)
-	if nights < 1 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dates"})
-		return
+
+	// BUG-08: the bed-type surcharge and child fee were previously
+	// computed only in the Flutter UI and the client's total was
+	// trusted. computeBookingCharges (pricing.go) runs the same
+	// formula server-side so the amount charged can't be tampered
+	// with client-side. BUG-03/04: the GST slab inside it is decided
+	// by the per-unit-night tariff, not the aggregated stay total.
+	childrenAbove5 := 0
+	if req.Addons != nil {
+		if v, ok := req.Addons["children_5_to_12"].(float64); ok {
+			childrenAbove5 = int(v)
+		}
 	}
 
-	baseAmount := float64(pricePerNight * nights * req.Units)
-	discount := 0.0
+	// ── Step 5: Validate coupon (applies to the whole subtotal) ──
+	// Price once with no discount to learn the subtotal the coupon's
+	// min_amount is checked against, then re-price with the rate.
+	discountRate := 0.0
 	couponCode := ""
-
-	// ── Step 5: Validate coupon ───────────────────────────────
 	if req.CouponCode != "" {
-		var discountRate float64
+		preCoupon := computeBookingCharges(pricePerNight, nights, req.Units, childrenAbove5, bedType, 0)
+
+		var rate float64
 		var minAmount int
 		var usedCount, maxUses int
 		var isActive bool
@@ -192,28 +221,25 @@ func createBooking(c *gin.Context) {
 		err := tx.QueryRow(`
 			SELECT discount, min_amount, used_count, max_uses, is_active, expires_at
 			FROM coupons WHERE code = $1
-		`, req.CouponCode).Scan(&discountRate, &minAmount, &usedCount, &maxUses, &isActive, &expiresAt)
+		`, req.CouponCode).Scan(&rate, &minAmount, &usedCount, &maxUses, &isActive, &expiresAt)
 
 		if err == nil && isActive &&
 			usedCount < maxUses &&
 			time.Now().Before(expiresAt) &&
-			baseAmount >= float64(minAmount) {
-			discount = baseAmount * discountRate
+			preCoupon.Subtotal >= float64(minAmount) {
+			discountRate = rate
 			couponCode = req.CouponCode
-			tx.Exec("UPDATE coupons SET used_count = used_count + 1 WHERE code = $1", req.CouponCode)
+			// BUG-07: do NOT bump used_count here — the booking is
+			// still 'pending' and may never be paid. The increment
+			// happens when payment is verified (payment-service).
 		}
 	}
 
-	// GST on tent accommodation: 12% (6% CGST + 6% SGST) for a taxable
-	// tariff of ₹7,500 or less per unit-night equivalent, 18% (9% + 9%)
-	// above that — matching the hotel-accommodation GST slabs.
-	taxableAmount := baseAmount - discount
-	gstRate := 0.12
-	if taxableAmount > 7500 {
-		gstRate = 0.18
-	}
-	tax := taxableAmount * gstRate
-	totalAmount := taxableAmount + tax
+	charges := computeBookingCharges(pricePerNight, nights, req.Units, childrenAbove5, bedType, discountRate)
+	baseAmount := charges.Base
+	discount := charges.Discount
+	tax := charges.Tax
+	totalAmount := charges.Total
 
 	// ── Step 5b: Lock today's exchange rate, if foreign ───────
 	//

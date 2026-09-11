@@ -168,15 +168,28 @@ func verifyPayment(c *gin.Context) {
 		return
 	}
 
-	// Update booking status to confirmed
-	_, err = db.Exec(`
+	// Update booking status to confirmed. Only a still-pending row
+	// flips — so a duplicate/retried verify call is a no-op here and
+	// does not double-count the coupon below (BUG-07).
+	res, err := db.Exec(`
 		UPDATE bookings
 		SET status = 'confirmed', payment_id = $1, updated_at = NOW()
-		WHERE booking_ref = $2
+		WHERE booking_ref = $2 AND status = 'pending'
 	`, req.RazorpayPaymentID, req.BookingRef)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to confirm booking"})
 		return
+	}
+
+	// BUG-07: burn the coupon use only now that the booking is
+	// actually paid — createBooking no longer does it at 'pending'
+	// time (where an abandoned booking would eat a use forever).
+	if rows, _ := res.RowsAffected(); rows > 0 {
+		db.Exec(`
+			UPDATE coupons SET used_count = used_count + 1
+			WHERE code = (SELECT coupon_code FROM bookings WHERE booking_ref = $1)
+			  AND code IS NOT NULL AND code <> ''
+		`, req.BookingRef)
 	}
 
 	fmt.Printf("✅ Payment verified for booking %s | Payment ID: %s\n",

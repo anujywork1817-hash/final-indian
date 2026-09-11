@@ -75,15 +75,18 @@ const double kCouponDiscount = 0.10;
 // ── Tax ──────────────────────────────────────────────────
 //
 // GST on tent accommodation follows the hotel-tariff slabs: 12%
-// (6% CGST + 6% SGST) for a taxable amount up to ₹7,500, 18% (9% +
-// 9%) above that. Must stay in sync with the same threshold in
-// kumbh_backend/booking-service/handler.go.
+// (6% CGST + 6% SGST) when the per-unit-night tariff is ₹7,500 or
+// less, 18% (9% + 9%) above that. BUG-03/04: the slab is decided by
+// the NIGHTLY room rate, never the aggregated stay total — a
+// ₹2,000/night tent booked for 4 nights (₹8,000) is still 12%.
+// Must stay in sync with computeBookingCharges in
+// kumbh_backend/booking-service/pricing.go.
 const double kGSTThreshold = 7500;
 const double kGSTRateLow = 0.12;
 const double kGSTRateHigh = 0.18;
 
-double gstRateFor(double taxableAmount) =>
-    taxableAmount > kGSTThreshold ? kGSTRateHigh : kGSTRateLow;
+double gstRateFor(double pricePerNight) =>
+    pricePerNight > kGSTThreshold ? kGSTRateHigh : kGSTRateLow;
 
 // ── App Info ─────────────────────────────────────────────
 const String kAppName = 'Bharat Tent Booking';
