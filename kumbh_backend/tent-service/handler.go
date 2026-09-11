@@ -299,12 +299,26 @@ func adminCreateTent(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"message": "Tent created successfully", "id": id})
 }
 
-// DELETE /admin/tents/:id — delete tent
+// DELETE /admin/tents/:id — soft-delete tent
+//
+// BUG-26: this used to be a hard DELETE. tents.id is referenced by
+// bookings.tent_id with no ON DELETE clause, so any tent with
+// booking history (i.e. any tent that has actually been used)
+// failed with a raw Postgres FK-violation 500 the moment an admin
+// tried to remove it. A tent with no bookings yet deleted cleanly,
+// which erased it from every past booking's join and its revenue
+// history along with it. is_active already exists and is already
+// respected by listTents/getTent's `WHERE is_active = TRUE` — reuse
+// it instead of actually deleting the row.
 func adminDeleteTent(c *gin.Context) {
 	id := c.Param("id")
-	_, err := db.Exec(`DELETE FROM tents WHERE id = $1`, id)
+	res, err := db.Exec(`UPDATE tents SET is_active = FALSE WHERE id = $1`, id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tent"})
+		return
+	}
+	if rows, _ := res.RowsAffected(); rows == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tent not found"})
 		return
 	}
 	logAdminAction(adminUsernameFromToken(c), "TENT_DELETED", "tent", id, "")

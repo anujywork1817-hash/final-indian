@@ -157,27 +157,64 @@ func verifyPayment(c *gin.Context) {
 	checkIn := checkInDate.Format("2 Jan 2006")
 	checkOut := checkOutDate.Format("2 Jan 2006")
 
+	// BUG-28: the payment INSERT and the booking status UPDATE used
+	// to be two separate, unrelated db.Exec calls. A crash or lost
+	// connection between them left a 'success' payment row pointing
+	// at a booking that was still 'pending' forever — the customer
+	// was charged but their booking never confirmed, with no
+	// automatic way to reconcile the two. Both writes now happen in
+	// one transaction, so either both land or neither does.
+	tx, err := db.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
 	// Save payment record
-	_, err = db.Exec(`
+	_, err = tx.Exec(`
 		INSERT INTO payments
 			(booking_ref, razorpay_order, razorpay_payment, razorpay_signature, amount, status)
 		VALUES ($1, $2, $3, $4, $5, 'success')
 	`, req.BookingRef, req.RazorpayOrderID, req.RazorpayPaymentID, req.RazorpaySignature, amount)
 	if err != nil {
+		// BUG-27: a UNIQUE index (migrations/016) now rejects a second
+		// 'success' row for the same razorpay_payment — this call is a
+		// duplicate (retry/webhook race) of one that already went
+		// through. Report it as the success it already is instead of
+		// a 500, without writing anything twice.
+		if isUniqueViolation(err, "razorpay_payment") {
+			tx.Rollback()
+			c.JSON(http.StatusOK, gin.H{
+				"message":     "Payment already verified! Booking confirmed 🪔",
+				"booking_ref": req.BookingRef,
+				"payment_id":  req.RazorpayPaymentID,
+				"status":      "confirmed",
+				"verified_at": time.Now(),
+			})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save payment"})
 		return
 	}
 
 	// Update booking status to confirmed. Only a still-pending row
 	// flips — so a duplicate/retried verify call is a no-op here and
-	// does not double-count the coupon below (BUG-07).
-	res, err := db.Exec(`
+	// does not double-count the coupon below (BUG-07). Runs inside
+	// the same transaction as the payment INSERT above (BUG-28).
+	res, err := tx.Exec(`
 		UPDATE bookings
 		SET status = 'confirmed', payment_id = $1, updated_at = NOW()
 		WHERE booking_ref = $2 AND status = 'pending'
 	`, req.RazorpayPaymentID, req.BookingRef)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to confirm booking"})
+		return
+	}
+	bookingConfirmedNow, _ := res.RowsAffected()
+
+	if err = tx.Commit(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to commit payment confirmation"})
 		return
 	}
 
@@ -194,6 +231,21 @@ func verifyPayment(c *gin.Context) {
 
 	fmt.Printf("✅ Payment verified for booking %s | Payment ID: %s\n",
 		req.BookingRef, req.RazorpayPaymentID)
+
+	if bookingConfirmedNow == 0 {
+		// Booking was already something other than 'pending' (already
+		// confirmed, or cancelled out from under this payment) — the
+		// payment record is saved either way, but skip re-sending the
+		// confirmation email/push/invoice/ledger entry below.
+		c.JSON(http.StatusOK, gin.H{
+			"message":     "Payment verified! Booking confirmed 🪔",
+			"booking_ref": req.BookingRef,
+			"payment_id":  req.RazorpayPaymentID,
+			"status":      "confirmed",
+			"verified_at": time.Now(),
+		})
+		return
+	}
 
 	// ── Send FCM notification ──────────────────────────────
 	go func() {

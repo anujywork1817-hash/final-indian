@@ -24,6 +24,23 @@ services:
       - ./migrations/002_missing_tables.sql:/docker-entrypoint-initdb.d/02_missing_tables.sql
       - ./migrations/003_refund_approval.sql:/docker-entrypoint-initdb.d/03_refund_approval.sql
       - ./migrations/004_cancellation_policy.sql:/docker-entrypoint-initdb.d/04_cancellation_policy.sql
+      # BUG-25: 005-015 existed as files but were never mounted, so a
+      # fresh dev DB (or a fresh RDS instance) never got the finance,
+      # payment-tracking, invoicing, ledger, RBAC/audit, vendor-payables
+      # or perf-index tables the Go code already queries — every one of
+      # these would 42P01 ("relation does not exist") on a clean deploy.
+      - ./migrations/005_finance_phase1.sql:/docker-entrypoint-initdb.d/05_finance_phase1.sql
+      - ./migrations/006_payment_tracking.sql:/docker-entrypoint-initdb.d/06_payment_tracking.sql
+      - ./migrations/007_expenses_multicurrency.sql:/docker-entrypoint-initdb.d/07_expenses_multicurrency.sql
+      - ./migrations/008_gateway_reconciliation.sql:/docker-entrypoint-initdb.d/08_gateway_reconciliation.sql
+      - ./migrations/009_invoicing.sql:/docker-entrypoint-initdb.d/09_invoicing.sql
+      - ./migrations/010_ledger_bank_reports.sql:/docker-entrypoint-initdb.d/10_ledger_bank_reports.sql
+      - ./migrations/011_rbac_audit.sql:/docker-entrypoint-initdb.d/11_rbac_audit.sql
+      - ./migrations/012_vendor_payables.sql:/docker-entrypoint-initdb.d/12_vendor_payables.sql
+      - ./migrations/013_refund_approval_reason.sql:/docker-entrypoint-initdb.d/13_refund_approval_reason.sql
+      - ./migrations/014_push_notifications.sql:/docker-entrypoint-initdb.d/14_push_notifications.sql
+      - ./migrations/015_perf_indexes.sql:/docker-entrypoint-initdb.d/15_perf_indexes.sql
+      - ./migrations/016_payment_integrity.sql:/docker-entrypoint-initdb.d/16_payment_integrity.sql
       - ./migrations/017_rate_limits.sql:/docker-entrypoint-initdb.d/17_rate_limits.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]

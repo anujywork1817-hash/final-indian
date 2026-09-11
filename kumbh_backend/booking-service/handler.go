@@ -1,16 +1,43 @@
 package main
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
+
+// newBookingRef returns a random "KTB-2027-NNNNNNN" reference. 7
+// crypto-random digits (10,000,000 possibilities) rather than the
+// old math/rand 5-digit space (only 100,000) — that was small enough
+// that busy periods hit the bookings.booking_ref UNIQUE constraint
+// often, and createBooking had no retry, so the customer's payment
+// step was already open when their booking failed with a raw 500.
+func newBookingRef() string {
+	n, err := rand.Int(rand.Reader, big.NewInt(10_000_000))
+	if err != nil {
+		// crypto/rand failure is effectively unreachable on any real
+		// OS; if it ever happens, still hand back *something* rather
+		// than panicking the request. The retry loop around the
+		// insert covers a collision either way.
+		n = big.NewInt(0)
+	}
+	return fmt.Sprintf("KTB-2027-%07d", n.Int64())
+}
+
+// isUniqueViolation reports whether err is a Postgres unique-key
+// violation (SQLSTATE 23505) on the named constraint.
+func isUniqueViolation(err error, constraint string) bool {
+	pqErr, ok := err.(*pq.Error)
+	return ok && pqErr.Code == "23505" && (constraint == "" || strings.Contains(string(pqErr.Constraint), constraint))
+}
 
 type Booking struct {
 	ID          int       `json:"id"`
@@ -250,29 +277,59 @@ func createBooking(c *gin.Context) {
 	// foreign_amount=NULL, so nothing changes for it.
 	lockedCurrency, lockedRate, foreignAmount := lockExchangeRateFor(req.Currency, totalAmount)
 
-	// ── Step 6: Generate unique booking ref ───────────────────
-	ref := fmt.Sprintf("KTB-2027-%05d", rand.Intn(99999))
-
-	// ── Step 7: Insert booking ────────────────────────────────
+	// ── Steps 6-7: Generate a booking ref and insert, retrying on a
+	// ref collision ────────────────────────────────────────────
+	//
+	// A collision aborts the current Postgres transaction (any error
+	// inside a tx does), so it can't just be retried in place — the
+	// whole INSERT is re-attempted with a fresh ref. Everything
+	// computed above (price, tax, availability) is unaffected by the
+	// ref itself, so only the ref + insert are redone.
+	const maxRefAttempts = 5
+	var ref string
 	var bookingID int
-	err = tx.QueryRow(`
-		INSERT INTO bookings
-			(booking_ref, phone, tent_id, tent_name, location, class,
-			 check_in, check_out, nights, guests, units,
-			 base_amount, coupon_code, discount, tax, total_amount, status,
-			 guest_name, guest_phone, id_proof, bed_type, gender_preference, addons,
-			 currency, exchange_rate, foreign_amount)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17,$18,$19,$20,$21,$22,$23,$24,$25)
-		RETURNING id
-	`, ref, phone, req.TentID, tentName, location, class,
-		req.CheckIn, req.CheckOut,
-		nights, req.Guests, req.Units,
-		baseAmount, couponCode, discount, tax, totalAmount,
-		guestName, guestPhone, idProof, bedType, genderPref, string(addonsJSON),
-		lockedCurrency, lockedRate, foreignAmount,
-	).Scan(&bookingID)
+	for attempt := 1; ; attempt++ {
+		ref = newBookingRef()
+		err = tx.QueryRow(`
+			INSERT INTO bookings
+				(booking_ref, phone, tent_id, tent_name, location, class,
+				 check_in, check_out, nights, guests, units,
+				 base_amount, coupon_code, discount, tax, total_amount, status,
+				 guest_name, guest_phone, id_proof, bed_type, gender_preference, addons,
+				 currency, exchange_rate, foreign_amount)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'pending',$17,$18,$19,$20,$21,$22,$23,$24,$25)
+			RETURNING id
+		`, ref, phone, req.TentID, tentName, location, class,
+			req.CheckIn, req.CheckOut,
+			nights, req.Guests, req.Units,
+			baseAmount, couponCode, discount, tax, totalAmount,
+			guestName, guestPhone, idProof, bedType, genderPref, string(addonsJSON),
+			lockedCurrency, lockedRate, foreignAmount,
+		).Scan(&bookingID)
 
-	if err != nil {
+		if err == nil {
+			break
+		}
+		if isUniqueViolation(err, "booking_ref") && attempt < maxRefAttempts {
+			// Transaction is aborted — start a new one and re-lock the
+			// tent row before trying again.
+			tx.Rollback()
+			tx, err = db.Begin()
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
+				return
+			}
+			defer tx.Rollback()
+			if err = tx.QueryRow(`
+				SELECT name, price, location, class, total_units
+				FROM tents WHERE id = $1 AND is_active = TRUE
+				FOR UPDATE
+			`, req.TentID).Scan(&tentName, &pricePerNight, &location, &class, &totalUnits); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to re-lock tent"})
+				return
+			}
+			continue
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create booking: " + err.Error()})
 		return
 	}
