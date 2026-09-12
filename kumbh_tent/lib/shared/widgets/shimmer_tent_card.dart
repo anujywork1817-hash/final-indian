@@ -20,11 +20,18 @@ class ShimmerTentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              height: 200,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            // Flexible, not a fixed 200px: callers box this card into
+            // different heights (260 in most lists, 320 in browse), and
+            // a fixed image height + fixed text block below it overflowed
+            // by 40px wherever the parent gave less than ~300px total.
+            Expanded(
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(
+                    top: Radius.circular(20),
+                  ),
+                ),
               ),
             ),
             Padding(
