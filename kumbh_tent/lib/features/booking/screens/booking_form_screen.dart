@@ -259,10 +259,12 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       _hasChildren ? _childrenAbove5 * _childFeePerNight * _nights : 0;
   double get _addonsTotal => _bedTypeSurcharge + _childrenCharge;
 
-  // Under-5s are free but capped at 2 per tent (matches common
-  // hotel/camp policy for a shared bed); total children can never
-  // exceed the guest count they're counted within.
-  int get _maxChildrenUnder5 => 2 * _units;
+  // Both children brackets are capped at 2 per booking (matches
+  // common hotel/camp policy for a shared bed) regardless of units;
+  // total children can also never exceed the guest count they're
+  // counted within.
+  static const int _maxChildrenUnder5 = 2;
+  static const int _maxChildrenAbove5 = 2;
   int get _maxTotalChildren => _guests;
   double get _subtotal => _baseTotal + _addonsTotal;
   double get _discount => _couponApplied ? _subtotal * _couponDiscountRate : 0;
@@ -431,6 +433,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   void _clampChildren() {
     if (_childrenUnder5 > _maxChildrenUnder5) {
       _childrenUnder5 = _maxChildrenUnder5;
+    }
+    if (_childrenAbove5 > _maxChildrenAbove5) {
+      _childrenAbove5 = _maxChildrenAbove5;
     }
     if (_childrenUnder5 + _childrenAbove5 > _maxTotalChildren) {
       _childrenAbove5 = (_maxTotalChildren - _childrenUnder5).clamp(
@@ -967,7 +972,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     _divider(),
                     _counter(
                       '5-12 yrs',
-                      '₹${_childFeePerNight.toStringAsFixed(0)}/night each',
+                      '₹${_childFeePerNight.toStringAsFixed(0)}/night each · max $_maxChildrenAbove5',
                       _childrenAbove5,
                       () {
                         if (_childrenAbove5 > 0) {
@@ -975,7 +980,12 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                         }
                       },
                       () {
-                        if (_childrenUnder5 + _childrenAbove5 >=
+                        if (_childrenAbove5 >= _maxChildrenAbove5) {
+                          _snack(
+                            'Max $_maxChildrenAbove5 children (5-12 yrs) per booking',
+                            AppColors.error,
+                          );
+                        } else if (_childrenUnder5 + _childrenAbove5 >=
                             _maxTotalChildren) {
                           _snack(
                             'Children can\'t exceed total guests ($_maxTotalChildren)',

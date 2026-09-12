@@ -18,6 +18,11 @@ const (
 	gstThresholdPerNight   = 7500.0
 	gstRateLow             = 0.12
 	gstRateHigh            = 0.18
+	// Matches booking_form_screen.dart's _maxChildrenAbove5 — capped
+	// per booking (not per unit), same as the under-5 bracket the
+	// Flutter form also caps at 2. Enforced here too so a tampered
+	// client can't claim more free/paid children than the UI allows.
+	maxChildrenAged5to12 = 2
 )
 
 type bookingCharges struct {
@@ -38,6 +43,9 @@ type bookingCharges struct {
 func computeBookingCharges(pricePerNight, nights, units, childrenAged5to12 int, bedType string, discountRate float64) bookingCharges {
 	if childrenAged5to12 < 0 {
 		childrenAged5to12 = 0
+	}
+	if childrenAged5to12 > maxChildrenAged5to12 {
+		childrenAged5to12 = maxChildrenAged5to12
 	}
 
 	base := float64(pricePerNight) * float64(nights) * float64(units)

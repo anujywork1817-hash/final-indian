@@ -78,3 +78,19 @@ func TestSingleBedNoSurchargeNegativeChildrenClamped(t *testing.T) {
 		t.Errorf("total = %v, want %v", got.Total, 6000*1.12)
 	}
 }
+
+// A tampered client claiming more children (5-12 yrs) than the
+// booking form allows must still only be charged/counted for the
+// capped amount, matching booking_form_screen.dart's
+// _maxChildrenAbove5 = 2.
+func TestChildrenAbove5CappedAtTwo(t *testing.T) {
+	uncapped := computeBookingCharges(2000, 2, 1, 5, "Single", 0)
+	capped := computeBookingCharges(2000, 2, 1, 2, "Single", 0)
+	if !approx(uncapped.ChildFee, capped.ChildFee) {
+		t.Errorf("ChildFee for 5 children = %v, want capped to match 2 children (%v)", uncapped.ChildFee, capped.ChildFee)
+	}
+	wantChildFee := 2 * childFeePerNight * 2 // 2 children x rate x 2 nights
+	if !approx(uncapped.ChildFee, wantChildFee) {
+		t.Errorf("ChildFee = %v, want %v", uncapped.ChildFee, wantChildFee)
+	}
+}
