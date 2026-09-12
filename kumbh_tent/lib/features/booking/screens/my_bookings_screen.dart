@@ -17,10 +17,10 @@ class MyBookingsScreen extends StatefulWidget {
   const MyBookingsScreen({super.key});
 
   @override
-  State<MyBookingsScreen> createState() => _MyBookingsScreenState();
+  State<MyBookingsScreen> createState() => MyBookingsScreenState();
 }
 
-class _MyBookingsScreenState extends State<MyBookingsScreen>
+class MyBookingsScreenState extends State<MyBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tab;
   List<dynamic> _bookings = [];
@@ -41,6 +41,16 @@ class _MyBookingsScreenState extends State<MyBookingsScreen>
     _tab = TabController(length: 3, vsync: this);
     _load();
   }
+
+  /// Re-fetches the booking list. HomeScreen holds a GlobalKey to this
+  /// state and calls this whenever the Bookings tab is selected —
+  /// this screen sits in an IndexedStack alongside the other tabs, so
+  /// it is built once and kept alive for the lifetime of the app;
+  /// without an explicit refresh, initState()'s one-time _load() is
+  /// the only fetch that ever happens, and a booking made after that
+  /// (or completed just now, straight from the payment flow) would
+  /// only show up after a manual pull-to-refresh.
+  Future<void> refresh() => _load();
 
   Future<void> _load() async {
     setState(() {

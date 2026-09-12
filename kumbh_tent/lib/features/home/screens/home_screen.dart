@@ -22,11 +22,21 @@ class _HomeScreenState extends State<HomeScreen> {
   // if the back button is pressed again while it's open.
   bool _exitDialogOpen = false;
 
+  // Bookings lives in an IndexedStack (see build()), so it's built
+  // once and kept alive rather than rebuilt on every tab switch —
+  // its initState() one-time fetch would otherwise never see a
+  // booking made after that, leaving the list stale until a manual
+  // pull-to-refresh. This key lets _navItem force a re-fetch instead
+  // whenever the Bookings tab is (re-)selected, so a booking just
+  // completed via the payment flow shows up as soon as the user taps
+  // back to this tab, no manual refresh needed.
+  final _bookingsKey = GlobalKey<MyBookingsScreenState>();
+
   // Explore stays at index 0 and Profile moves to the end; News and
   // History sit between Bookings and Profile.
-  final List<Widget> _screens = [
+  late final List<Widget> _screens = [
     const BrowseScreen(),
-    const MyBookingsScreen(),
+    MyBookingsScreen(key: _bookingsKey),
     const NewsScreen(),
     const HistoryScreen(),
     const ProfileScreen(),
@@ -148,7 +158,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => setState(() => _currentIndex = index),
+        onTap: () {
+          setState(() => _currentIndex = index);
+          if (index == 1) _bookingsKey.currentState?.refresh();
+        },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
