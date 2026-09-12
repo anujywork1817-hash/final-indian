@@ -333,13 +333,20 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
     }
     setState(() => _isLoading = true);
     try {
-      await ApiService.sendOTP(_phoneController.text);
+      final res = await ApiService.sendOTP(_phoneController.text);
       if (!mounted) return;
       setState(() => _isLoading = false);
+      // No SMS provider is wired up yet — the backend only includes
+      // `otp` here with OTP_DEBUG=true on the server, for testing.
+      // Remove this once real SMS delivery exists.
+      final debugOtp = res['otp'] as String?;
+      final message = debugOtp != null
+          ? 'OTP sent to ${_phoneController.text}: $debugOtp'
+          : 'OTP sent to ${_phoneController.text}';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'OTP sent to ${_phoneController.text}',
+            message,
             style: GoogleFonts.poppins(color: Colors.white),
           ),
           backgroundColor: AppColors.saffronDark,
@@ -353,7 +360,8 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen>
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => OTPScreen(phone: _phoneController.text),
+          builder: (_) =>
+              OTPScreen(phone: _phoneController.text, debugOtp: debugOtp),
         ),
       );
     } catch (e) {

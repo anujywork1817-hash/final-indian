@@ -59,6 +59,11 @@ services:
       - AUTH_SERVICE_PORT=8081
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      # Temporary, until a real SMS provider is wired up: returns the
+      # OTP in the send-otp response so it's visible on-screen for
+      # manual testing. Flip to false (or unset) to go back to never
+      # exposing it — see auth-service/handler.go sendOTP.
+      - OTP_DEBUG=${OTP_DEBUG:-false}
     restart: unless-stopped
 
   # ── Tent Service ──────────────────────────────────────

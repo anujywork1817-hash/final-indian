@@ -43,17 +43,25 @@ func sendOTP(c *gin.Context) {
 		return
 	}
 
-	// The OTP must only ever leave the server via the SMS/notification
-	// channel. Never in the HTTP response, and only in logs when
-	// explicitly opted in for local debugging.
-	if os.Getenv("OTP_DEBUG") == "true" {
+	// The OTP is meant to only ever leave the server via a real SMS/
+	// notification channel. No provider is wired up yet, so with
+	// OTP_DEBUG=true it's echoed back here (and logged) purely so
+	// manual testing is possible without one — this MUST be false
+	// (the default) the moment a real SMS provider exists, and stays
+	// something to explicitly flip back off, not a permanent state.
+	debugOTP := os.Getenv("OTP_DEBUG") == "true"
+	if debugOTP {
 		fmt.Printf("[OTP_DEBUG] %s -> %s\n", req.Phone, otp)
 	}
 
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"message": "OTP sent successfully",
 		"phone":   req.Phone,
-	})
+	}
+	if debugOTP {
+		resp["otp"] = otp
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 func verifyOTP(c *gin.Context) {

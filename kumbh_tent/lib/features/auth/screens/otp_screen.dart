@@ -10,7 +10,13 @@ import 'package:kumbh_tent/shared/widgets/premium_button.dart';
 
 class OTPScreen extends StatefulWidget {
   final String phone;
-  const OTPScreen({super.key, required this.phone});
+  // No SMS provider is wired up yet — when the server has
+  // OTP_DEBUG=true it echoes the code back in the send-otp response,
+  // and login_screen passes it through here so it's visible on
+  // screen for manual testing. Null once a real SMS provider exists
+  // (or OTP_DEBUG is off), and this whole banner/autofill disappears.
+  final String? debugOtp;
+  const OTPScreen({super.key, required this.phone, this.debugOtp});
 
   @override
   State<OTPScreen> createState() => _OTPScreenState();
@@ -28,6 +34,7 @@ class _OTPScreenState extends State<OTPScreen>
   bool _isResending = false;
   int _resendSeconds = 30;
   Timer? _timer;
+  String? _debugOtp;
 
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeAnim;
@@ -41,6 +48,16 @@ class _OTPScreenState extends State<OTPScreen>
     )..forward();
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _startTimer();
+    _applyDebugOtp(widget.debugOtp);
+  }
+
+  void _applyDebugOtp(String? otp) {
+    _debugOtp = otp;
+    if (otp != null && otp.length == 6) {
+      for (var i = 0; i < 6; i++) {
+        _controllers[i].text = otp[i];
+      }
+    }
   }
 
   @override
@@ -77,12 +94,19 @@ class _OTPScreenState extends State<OTPScreen>
   Future<void> _resendOTP() async {
     setState(() => _isResending = true);
     try {
-      await ApiService.sendOTP(widget.phone);
+      final res = await ApiService.sendOTP(widget.phone);
       if (mounted) {
-        _snack('OTP sent to ${widget.phone}', AppColors.saffronDark);
+        final debugOtp = res['otp'] as String?;
+        _snack(
+          debugOtp != null
+              ? 'OTP sent to ${widget.phone}: $debugOtp'
+              : 'OTP sent to ${widget.phone}',
+          AppColors.saffronDark,
+        );
         for (final c in _controllers) {
           c.clear();
         }
+        setState(() => _applyDebugOtp(debugOtp));
         _focusNodes[0].requestFocus();
         _startTimer();
       }
@@ -167,6 +191,33 @@ class _OTPScreenState extends State<OTPScreen>
                             fontSize: 13,
                           ),
                         ),
+                        if (_debugOtp != null) ...[
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.saffron.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: AppColors.saffron.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                            ),
+                            child: Text(
+                              'TEST MODE — OTP: $_debugOtp',
+                              style: GoogleFonts.poppins(
+                                color: AppColors.saffronDark,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
