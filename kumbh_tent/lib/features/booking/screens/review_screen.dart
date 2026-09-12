@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:kumbh_tent/core/network/api_service.dart';
@@ -66,7 +67,24 @@ class _ReviewScreenState extends State<ReviewScreen> {
         if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-      if (mounted) _snack('Failed to submit review: $e', AppColors.error);
+      // A DioException's own toString() is a multi-paragraph essay
+      // about the meaning of HTTP status codes, not the actual
+      // reason the server gave — surface that instead when there is
+      // one (e.g. "can only review confirmed, checked-in, or
+      // completed bookings"), matching what other screens do for
+      // API errors.
+      String message = 'Failed to submit review';
+      if (e is DioException) {
+        final serverError = e.response?.data is Map
+            ? (e.response?.data as Map)['error']
+            : null;
+        message = serverError is String
+            ? 'Failed to submit review: $serverError'
+            : 'Failed to submit review: ${e.message}';
+      } else {
+        message = 'Failed to submit review: $e';
+      }
+      if (mounted) _snack(message, AppColors.error);
       if (mounted) setState(() => _isSubmitting = false);
     }
   }

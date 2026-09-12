@@ -19,6 +19,26 @@ type Review struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
+// canReviewBookingStatus reports whether a booking in this status can
+// be reviewed.
+//
+// The app's booking-history "Rate & review your stay" button shows
+// for any non-cancelled booking, including one the guest has
+// actually checked into but that the nightly auto-complete cron
+// (booking-service/reminders.go) hasn't yet flipped to 'completed' —
+// the realistic moment someone submits a "How was your stay?" review
+// is right after arriving, not only after checkout. This used to
+// reject 'checked_in' with "can only review confirmed bookings",
+// which was backwards: 'confirmed' alone means paid-but-not-arrived.
+func canReviewBookingStatus(status string) bool {
+	switch status {
+	case "confirmed", "checked_in", "completed":
+		return true
+	default:
+		return false
+	}
+}
+
 // POST /tents/:id/reviews
 func submitReview(c *gin.Context) {
 	phone := verifiedPhone(c)
@@ -59,8 +79,8 @@ func submitReview(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
 		return
 	}
-	if bookingStatus != "confirmed" && bookingStatus != "completed" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "can only review confirmed bookings"})
+	if !canReviewBookingStatus(bookingStatus) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "can only review confirmed, checked-in, or completed bookings"})
 		return
 	}
 
