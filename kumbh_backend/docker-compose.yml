@@ -70,6 +70,11 @@ services:
     environment:
       - TENT_SERVICE_PORT=8082
       - DATABASE_URL=${DATABASE_URL}
+      # tent-service/main.go requireEnv()'s this too (Phase 1 security
+      # hardening) - it was missed here, so tent-service crash-looped
+      # with "FATAL: required env var(s) not set: JWT_SECRET" the
+      # first time this compose file's images were actually redeployed.
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
     restart: unless-stopped
 
   # ── Booking Service ──────────────────────────────────
