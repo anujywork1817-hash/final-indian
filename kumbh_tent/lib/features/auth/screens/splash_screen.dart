@@ -81,7 +81,7 @@ class _SplashScreenState extends State<SplashScreen>
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) =>
-            token != null ? HomeScreen() : PhoneLoginScreen(),
+            token != null ? HomeScreen(key: homeScreenKey) : PhoneLoginScreen(),
         transitionsBuilder: (context, anim, secondaryAnimation, child) =>
             FadeTransition(opacity: anim, child: child),
         transitionDuration: const Duration(milliseconds: 500),

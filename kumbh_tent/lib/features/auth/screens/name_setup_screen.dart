@@ -67,7 +67,7 @@ class _NameSetupScreenState extends State<NameSetupScreen>
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => HomeScreen(key: homeScreenKey)),
           (r) => false,
         );
       }
@@ -77,7 +77,7 @@ class _NameSetupScreenState extends State<NameSetupScreen>
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          MaterialPageRoute(builder: (_) => HomeScreen(key: homeScreenKey)),
           (r) => false,
         );
       }

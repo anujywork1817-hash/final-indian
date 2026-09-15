@@ -409,7 +409,7 @@ class _OTPScreenState extends State<OTPScreen>
           MaterialPageRoute(
             builder: (_) => (name == null || name.isEmpty)
                 ? NameSetupScreen(phone: widget.phone)
-                : const HomeScreen(),
+                : HomeScreen(key: homeScreenKey),
           ),
           (route) => false,
         );

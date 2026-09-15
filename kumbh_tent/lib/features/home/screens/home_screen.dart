@@ -8,14 +8,21 @@ import 'package:kumbh_tent/features/news/screens/news_screen.dart';
 import 'package:kumbh_tent/features/history/screens/history_screen.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
 
+// Shared across every place HomeScreen is constructed (splash,
+// login, name-setup — see those files) so AppRouterDelegate
+// (shared/screens/app_root.dart) can reach whichever instance is
+// actually mounted and hand it the back-press: switch to the first
+// tab, or show the exit-confirmation dialog if already there.
+final GlobalKey<HomeScreenState> homeScreenKey = GlobalKey<HomeScreenState>();
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   // Guards against a second exit dialog stacking on top of the first
@@ -42,7 +49,18 @@ class _HomeScreenState extends State<HomeScreen> {
     const ProfileScreen(),
   ];
 
-  Future<void> _handleBack() async {
+  /// Entry point for every back-press/swipe once nothing is pushed on
+  /// top of Home — called both by this screen's own [PopScope] and,
+  /// more importantly, directly by [AppRouterDelegate] (see
+  /// shared/screens/app_root.dart) via [homeScreenKey]. Predictive
+  /// back on Android only reliably reaches a [PopScope] that is
+  /// registered from the moment the route becomes current, which a
+  /// PopScope nested this far down the tree (inside an [IndexedStack]
+  /// tab, itself inside a bare [Navigator] with no outer PopScope)
+  /// is not guaranteed to be — the direct call is what actually fires
+  /// on every tab, every time, whether from the hardware button or an
+  /// edge swipe.
+  Future<void> handleBack() async {
     // Any tab other than the first: back returns to the first tab
     // rather than prompting to exit — keeps bottom-nav back behavior.
     if (_currentIndex != 0) {
@@ -116,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        _handleBack();
+        handleBack();
       },
       child: Scaffold(
       body: IndexedStack(index: _currentIndex, children: _screens),
