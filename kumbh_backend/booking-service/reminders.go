@@ -48,7 +48,17 @@ func sendFCMNotification(fcmToken, title, body string) {
 		return
 	}
 
-	projectID := "kumbh-tent-19e88"
+	// BUG: this used to hardcode projectID = "kumbh-tent-19e88" — a
+	// stale/renamed Firebase project that no longer matches this
+	// service account's actual project ("bharat-tent", per
+	// firebase-service-account.json's own project_id). FCM rejects
+	// every send when the URL's project doesn't match the credential
+	// that signed the request, so this silently failed 100% of the
+	// time — every push notification this service ever tried to send
+	// was swallowed by the fmt.Printf below with nothing surfaced
+	// anywhere. Deriving it from the credentials themselves means it
+	// can never drift out of sync with the JSON file again.
+	projectID := conf.ProjectID
 	url := fmt.Sprintf(
 		"https://fcm.googleapis.com/v1/projects/%s/messages:send",
 		projectID,

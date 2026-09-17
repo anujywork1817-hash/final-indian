@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Replaces the old blanket android:usesCleartextTraffic="true", which
+  allowed plaintext HTTP to ANY host from the whole app — a real
+  downgrade/MITM risk on public wifi even though the shipped app only
+  ever points kBaseUrl at CloudFront over HTTPS
+  (kumbh_tent/lib/core/constants/constants.dart).
+
+  Cleartext is scoped to exactly the local-dev-only hosts named there
+  (localhost via the adb tunnel, the Android emulator's host alias,
+  and the developer's LAN IP) so `flutter run` against a local
+  docker-compose backend keeps working. Every other domain — anything
+  the shipped app actually talks to — falls through to the base
+  config, which requires HTTPS.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">192.168.1.40</domain>
+    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>
