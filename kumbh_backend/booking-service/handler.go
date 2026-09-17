@@ -41,30 +41,34 @@ func isUniqueViolation(err error, constraint string) bool {
 }
 
 type Booking struct {
-	ID          int       `json:"id"`
-	BookingRef  string    `json:"booking_ref"`
-	Phone       string    `json:"phone"`
-	TentID      int       `json:"tent_id"`
-	TentName    string    `json:"tent_name"`
-	Location    string    `json:"location"`
-	Class       string    `json:"class"`
-	CheckIn     string    `json:"check_in"`
-	CheckOut    string    `json:"check_out"`
-	Nights      int       `json:"nights"`
-	Guests      int       `json:"guests"`
-	Units       int       `json:"units"`
-	BaseAmount  float64   `json:"base_amount"`
-	CouponCode  string    `json:"coupon_code,omitempty"`
-	Discount    float64   `json:"discount"`
-	Tax         float64   `json:"tax"`
-	TotalAmount float64   `json:"total_amount"`
-	Status      string    `json:"status"`
-	PaymentID   string    `json:"payment_id,omitempty"`
-	GuestName   string    `json:"guest_name,omitempty"`
-	GuestPhone  string    `json:"guest_phone,omitempty"`
-	IDProof     string    `json:"id_proof,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	Images      []string  `json:"images"`
+	ID          int     `json:"id"`
+	BookingRef  string  `json:"booking_ref"`
+	Phone       string  `json:"phone"`
+	TentID      int     `json:"tent_id"`
+	TentName    string  `json:"tent_name"`
+	Location    string  `json:"location"`
+	Class       string  `json:"class"`
+	CheckIn     string  `json:"check_in"`
+	CheckOut    string  `json:"check_out"`
+	Nights      int     `json:"nights"`
+	Guests      int     `json:"guests"`
+	Units       int     `json:"units"`
+	BaseAmount  float64 `json:"base_amount"`
+	CouponCode  string  `json:"coupon_code,omitempty"`
+	Discount    float64 `json:"discount"`
+	Tax         float64 `json:"tax"`
+	TotalAmount float64 `json:"total_amount"`
+	Status      string  `json:"status"`
+	PaymentID   string  `json:"payment_id,omitempty"`
+	GuestName   string  `json:"guest_name,omitempty"`
+	GuestPhone  string  `json:"guest_phone,omitempty"`
+	IDProof     string  `json:"id_proof,omitempty"`
+	// Whether an Aadhaar/ID-proof image or PDF has been uploaded for
+	// this booking — never the S3 key itself, which the admin panel
+	// only ever gets as a short-lived presigned URL (see documents.go).
+	HasIDProofDoc bool      `json:"has_id_proof_doc"`
+	CreatedAt     time.Time `json:"created_at"`
+	Images        []string  `json:"images"`
 
 	// Refund fields, populated for cancelled bookings so the
 	// app can show the real state instead of a hardcoded
@@ -226,9 +230,13 @@ func createBooking(c *gin.Context) {
 	// with client-side. BUG-03/04: the GST slab inside it is decided
 	// by the per-unit-night tariff, not the aggregated stay total.
 	childrenAbove5 := 0
+	childrenUnder5 := 0
 	if req.Addons != nil {
 		if v, ok := req.Addons["children_5_to_12"].(float64); ok {
 			childrenAbove5 = int(v)
+		}
+		if v, ok := req.Addons["children_under_5"].(float64); ok {
+			childrenUnder5 = int(v)
 		}
 	}
 
@@ -238,7 +246,7 @@ func createBooking(c *gin.Context) {
 	discountRate := 0.0
 	couponCode := ""
 	if req.CouponCode != "" {
-		preCoupon := computeBookingCharges(pricePerNight, nights, req.Units, childrenAbove5, bedType, 0)
+		preCoupon := computeBookingCharges(pricePerNight, nights, req.Units, childrenAbove5, childrenUnder5, bedType, 0)
 
 		var rate float64
 		var minAmount int
@@ -263,7 +271,7 @@ func createBooking(c *gin.Context) {
 		}
 	}
 
-	charges := computeBookingCharges(pricePerNight, nights, req.Units, childrenAbove5, bedType, discountRate)
+	charges := computeBookingCharges(pricePerNight, nights, req.Units, childrenAbove5, childrenUnder5, bedType, discountRate)
 	baseAmount := charges.Base
 	discount := charges.Discount
 	tax := charges.Tax
@@ -836,6 +844,7 @@ func adminGetBookings(c *gin.Context) {
 		       b.base_amount, COALESCE(b.coupon_code,''), b.discount, b.tax,
 		       b.total_amount, b.status, COALESCE(b.payment_id,''),
 		       COALESCE(b.guest_name,''), COALESCE(b.guest_phone,''), COALESCE(b.id_proof,''),
+		       (b.id_proof_doc_key IS NOT NULL AND b.id_proof_doc_key != ''),
 		       b.created_at
 		FROM bookings b
 		ORDER BY b.created_at DESC
@@ -857,6 +866,7 @@ func adminGetBookings(c *gin.Context) {
 			&b.BaseAmount, &b.CouponCode, &b.Discount, &b.Tax,
 			&b.TotalAmount, &b.Status, &b.PaymentID,
 			&b.GuestName, &b.GuestPhone, &b.IDProof,
+			&b.HasIDProofDoc,
 			&b.CreatedAt,
 		)
 		b.Images = []string{}

@@ -8,6 +8,7 @@ import 'package:kumbh_tent/core/network/api_service.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
 import 'package:kumbh_tent/features/booking/screens/e_ticket_screen.dart';
 import 'package:kumbh_tent/features/booking/screens/review_screen.dart';
+import 'package:kumbh_tent/features/payment/screens/payment_screen.dart';
 import 'package:kumbh_tent/features/tents/screens/browse_screen.dart';
 import 'package:kumbh_tent/shared/widgets/premium_badge.dart';
 import 'package:kumbh_tent/shared/widgets/shimmer_tent_card.dart';
@@ -83,6 +84,58 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
         _loading = false;
       });
     }
+  }
+
+  /// A pending booking (payment never completed, or the user backed
+  /// out of the Razorpay sheet) still holds its unit — this lets them
+  /// pick up the same booking_ref and pay for it instead of it just
+  /// sitting there until the no-show sweep releases it.
+  void _payNow(Map<String, dynamic> b) {
+    DateTime? parseDate(dynamic iso) {
+      if (iso == null) return null;
+      try {
+        return DateTime.parse(iso.toString());
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final checkIn = parseDate(b['check_in']);
+    final checkOut = parseDate(b['check_out']);
+    if (checkIn == null || checkOut == null) {
+      _snack('Could not load booking dates', AppColors.error);
+      return;
+    }
+
+    final couponCode = (b['coupon_code'] as String?)?.isNotEmpty == true
+        ? b['coupon_code'] as String
+        : null;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PaymentScreen(
+          tent: {
+            'id': b['tent_id'],
+            'name': b['tent_name'] ?? 'Tent',
+            'location': b['location'] ?? '',
+            'class': b['class'] ?? '',
+          },
+          checkIn: checkIn,
+          checkOut: checkOut,
+          guests: (b['guests'] as num?)?.toInt() ?? 1,
+          units: (b['units'] as num?)?.toInt() ?? 1,
+          totalAmount: ((b['total_amount'] ?? b['total_price'] ?? 0) as num)
+              .toDouble(),
+          bookingRef: (b['booking_ref'] ?? b['id'])?.toString() ?? '',
+          taxableAmount:
+              ((b['base_amount'] ?? 0) as num).toDouble() -
+              ((b['discount'] ?? 0) as num).toDouble(),
+          tax: ((b['tax'] ?? 0) as num).toDouble(),
+          couponCode: couponCode,
+        ),
+      ),
+    ).then((_) => _load());
   }
 
   Future<void> _cancel(String ref) async {
@@ -528,6 +581,7 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
             booking: items[i],
             onCancel: () => _cancel(ref),
             onClear: () => _clear(ref),
+            onPayNow: () => _payNow(items[i]),
             onTicket: () {
               final b = items[i];
               String fmtDate(dynamic iso) {
@@ -677,6 +731,7 @@ class _BookingCard extends StatelessWidget {
   final Map<String, dynamic> booking;
   final VoidCallback onCancel;
   final VoidCallback onClear;
+  final VoidCallback onPayNow;
   final VoidCallback onTicket;
   final VoidCallback onReview;
 
@@ -684,6 +739,7 @@ class _BookingCard extends StatelessWidget {
     required this.booking,
     required this.onCancel,
     required this.onClear,
+    required this.onPayNow,
     required this.onTicket,
     required this.onReview,
   });
@@ -695,6 +751,31 @@ class _BookingCard extends StatelessWidget {
       return '${['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][d.month]} ${d.day}, ${d.year}';
     } catch (_) {
       return iso;
+    }
+  }
+
+  // created_at comes back from the server as UTC (Go's time.Time JSON
+  // marshaling). Every guest booking this app for is in India, so
+  // this always shows IST (UTC+5:30) regardless of the device's own
+  // timezone/locale, rather than DateTime.toLocal()'s device-timezone
+  // conversion.
+  static const _istOffset = Duration(hours: 5, minutes: 30);
+
+  String _fmtBookedAt(String? iso) {
+    if (iso == null || iso.isEmpty) return '—';
+    try {
+      final utc = DateTime.parse(iso).toUtc();
+      final ist = utc.add(_istOffset);
+      const months = [
+        '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+      ];
+      final hour12 = ist.hour % 12 == 0 ? 12 : ist.hour % 12;
+      final minute = ist.minute.toString().padLeft(2, '0');
+      final ampm = ist.hour >= 12 ? 'PM' : 'AM';
+      return '${months[ist.month]} ${ist.day}, ${ist.year} · $hour12:$minute $ampm IST';
+    } catch (_) {
+      return '—';
     }
   }
 
@@ -878,6 +959,23 @@ class _BookingCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Booked on',
+                        style: GoogleFonts.poppins(
+                          fontSize: 10,
+                          color: AppColors.textMuted,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      Text(
+                        _fmtBookedAt(booking['created_at'] as String?),
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -981,7 +1079,15 @@ class _BookingCard extends StatelessWidget {
                     ],
                   ],
                 ),
-                if (!cancelled && !noShow) ...[
+                if (_status == 'pending') ...[
+                  const SizedBox(height: 8),
+                  PremiumButton(
+                    label: 'Complete Payment',
+                    icon: Icons.payment_rounded,
+                    onPressed: onPayNow,
+                    verticalPadding: 12,
+                  ),
+                ] else if (!cancelled && !noShow) ...[
                   const SizedBox(height: 8),
                   PremiumButton(
                     label: 'Rate & review your stay',

@@ -1,5 +1,7 @@
 import 'dart:async' show unawaited;
+import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -44,6 +46,26 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   String? _phoneError;
   String? _idProofError;
 
+  // Aadhaar photo/PDF, picked but not uploaded until the booking
+  // itself is created (uploadIDProofDoc needs a real booking_ref).
+  // Optional — never blocks booking creation if left empty, or if
+  // the upload itself fails afterwards.
+  File? _idProofDoc;
+  String? _idProofDocName;
+
+  Future<void> _pickIdProofDoc() async {
+    final result = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+    );
+    final path = result?.path;
+    if (path == null) return;
+    setState(() {
+      _idProofDoc = File(path);
+      _idProofDocName = result!.name;
+    });
+  }
+
   // Airport/station pickup, puja kit, and Pilgrim Services
   // (Godavari walk, prasad thali) add-ons were removed from the
   // booking form. Their state, charges, price rows and booking
@@ -58,6 +80,10 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   int _childrenUnder5 = 0;
   int _childrenAbove5 = 0;
   static const double _childFeePerNight = 500.0;
+  // Under-5 is charged too now (half the 5-12 rate), not free — still
+  // capped at 2 per booking like the 5-12 bracket. Must match
+  // childUnder5FeePerNight in booking-service/pricing.go.
+  static const double _childUnder5FeePerNight = 250.0;
 
   // ── Per-date availability (for calendar color coding) ───────
   //
@@ -139,6 +165,81 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       }
     }
     return true;
+  }
+
+  Widget _idProofDocPicker() {
+    final hasDoc = _idProofDoc != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Upload Aadhaar (photo or PDF) — optional',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: _pickIdProofDoc,
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            decoration: BoxDecoration(
+              color: hasDoc
+                  ? AppColors.success.withValues(alpha: 0.06)
+                  : AppColors.softSurface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: hasDoc ? AppColors.success : AppColors.border,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  hasDoc
+                      ? Icons.check_circle_rounded
+                      : Icons.upload_file_rounded,
+                  color: hasDoc ? AppColors.success : AppColors.textMuted,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    hasDoc
+                        ? _idProofDocName ?? 'Document selected'
+                        : 'Tap to attach a JPG, PNG or PDF (max 8 MB)',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w500,
+                      color: hasDoc
+                          ? AppColors.textPrimary
+                          : AppColors.textMuted,
+                    ),
+                  ),
+                ),
+                if (hasDoc)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _idProofDoc = null;
+                      _idProofDocName = null;
+                    }),
+                    child: const Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   Widget _availabilityLegendDot(Color color, String label) {
@@ -255,8 +356,11 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   double get _bedTypeSurcharge => _bedType == 'Double'
       ? _baseTotal * _doubleBedSurchargeRate
       : 0;
-  double get _childrenCharge =>
+  double get _childrenAbove5Charge =>
       _hasChildren ? _childrenAbove5 * _childFeePerNight * _nights : 0;
+  double get _childrenUnder5Charge =>
+      _hasChildren ? _childrenUnder5 * _childUnder5FeePerNight * _nights : 0;
+  double get _childrenCharge => _childrenAbove5Charge + _childrenUnder5Charge;
   double get _addonsTotal => _bedTypeSurcharge + _childrenCharge;
 
   // Both children brackets are capped at 2 per booking (matches
@@ -385,6 +489,18 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       // Units just booked are no longer free — refresh so the
       // calendar's colors reflect the new state immediately.
       unawaited(_loadAvailability());
+      // Fire-and-forget: an upload failure here must never block the
+      // booking or payment flow that already succeeded. The guest
+      // (or an admin, on request) can retry it later.
+      if (_idProofDoc != null) {
+        unawaited(
+          ApiService.uploadIDProofDoc(
+            bookingRef: bookingRef,
+            filePath: _idProofDoc!.path,
+            fileName: _idProofDocName ?? 'id_proof',
+          ).catchError((_) {}),
+        );
+      }
       if (mounted) {
         Navigator.push(
           context,
@@ -637,6 +753,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       }
                     },
                   ),
+                  const SizedBox(height: 14),
+                  _idProofDocPicker(),
                 ],
               ),
             ),
@@ -693,6 +811,14 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     enabledDayPredicate: _isDaySelectable,
                     calendarBuilders: CalendarBuilders(
                       defaultBuilder: (context, day, focusedDay) =>
+                          _buildAvailabilityCell(day),
+                      // Sold-out (and mid-range-blocked) days come back
+                      // false from enabledDayPredicate, so table_calendar
+                      // renders them through disabledBuilder instead of
+                      // defaultBuilder — without this, booked dates fell
+                      // back to the library's plain grey "disabled" look
+                      // and never showed red.
+                      disabledBuilder: (context, day, focusedDay) =>
                           _buildAvailabilityCell(day),
                     ),
                     calendarStyle: CalendarStyle(
@@ -945,7 +1071,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     _divider(),
                     _counter(
                       'Below 5 yrs',
-                      'Free · max $_maxChildrenUnder5 per tent',
+                      '₹${_childUnder5FeePerNight.toStringAsFixed(0)}/night each · max $_maxChildrenUnder5',
                       _childrenUnder5,
                       () {
                         if (_childrenUnder5 > 0) {
@@ -955,7 +1081,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       () {
                         if (_childrenUnder5 >= _maxChildrenUnder5) {
                           _snack(
-                            'Max $_maxChildrenUnder5 free young children per tent',
+                            'Max $_maxChildrenUnder5 children (below 5 yrs) per booking',
                             AppColors.error,
                           );
                         } else if (_childrenUnder5 + _childrenAbove5 >=
@@ -1165,7 +1291,12 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     if (_hasChildren && _childrenAbove5 > 0)
                       _priceRow(
                         'Child fee (5-12 yrs) × $_childrenAbove5 × $_nights nights',
-                        '₹${_childrenCharge.toStringAsFixed(0)}',
+                        '₹${_childrenAbove5Charge.toStringAsFixed(0)}',
+                      ),
+                    if (_hasChildren && _childrenUnder5 > 0)
+                      _priceRow(
+                        'Child fee (below 5 yrs) × $_childrenUnder5 × $_nights nights',
+                        '₹${_childrenUnder5Charge.toStringAsFixed(0)}',
                       ),
                     if (_couponApplied)
                       _priceRow(

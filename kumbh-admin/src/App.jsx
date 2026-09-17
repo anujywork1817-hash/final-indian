@@ -862,7 +862,24 @@ const Bookings = () => {
   const [acct, setAcct] = useState(null);
   const [acctLoading, setAcctLoading] = useState(false);
   const [acctLog, setAcctLog] = useState([]);
+  const [idDocLoadingRef, setIdDocLoadingRef] = useState(null);
   const statuses = ["all", "confirmed", "pending", "checked_in", "completed", "cancelled"];
+
+  // Opens the guest's uploaded Aadhaar/ID-proof image or PDF in a new
+  // tab via a short-lived (15 min) presigned S3 URL fetched fresh on
+  // every click — never cached client-side, since the URL itself
+  // grants access to the file for its lifetime.
+  const viewIdProofDoc = async (ref) => {
+    setIdDocLoadingRef(ref);
+    try {
+      const d = await apiGet(`/admin/bookings/${ref}/id-proof-doc`);
+      if (d?.url) window.open(d.url, "_blank", "noopener,noreferrer");
+      else alert("No ID proof document uploaded for this booking.");
+    } catch (e) {
+      alert("Could not load the ID proof document.");
+    }
+    setIdDocLoadingRef(null);
+  };
 
   const openAccounting = async (ref) => {
     setAcctRef(ref);
@@ -976,6 +993,11 @@ const Bookings = () => {
                       {b.status === "checked_in" && <RowAction onClick={() => updateStatus(b.booking_ref, "completed")} tone="purple">Complete</RowAction>}
                       {!["cancelled","completed"].includes(b.status) && <RowAction onClick={() => updateStatus(b.booking_ref, "cancelled")} tone="red">Cancel</RowAction>}
                       <RowAction onClick={() => openAccounting(b.booking_ref)} tone="purple">Accounting</RowAction>
+                      {b.has_id_proof_doc && (
+                        <RowAction onClick={() => viewIdProofDoc(b.booking_ref)} tone="amber" disabled={idDocLoadingRef === b.booking_ref}>
+                          {idDocLoadingRef === b.booking_ref ? "Loading..." : "ID Proof"}
+                        </RowAction>
+                      )}
                     </div>
                   </td>
                 </tr>

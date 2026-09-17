@@ -79,6 +79,8 @@ CREATE TABLE IF NOT EXISTS bookings (
     guest_name    VARCHAR(200),
     guest_phone   VARCHAR(15),
     id_proof      VARCHAR(100),
+    id_proof_doc_key VARCHAR(300), -- S3 object key of an uploaded Aadhaar image/PDF (migration 018)
+    id_proof_doc_uploaded_at TIMESTAMPTZ,
     bed_type      VARCHAR(20) DEFAULT 'Single',
     gender_preference VARCHAR(20) DEFAULT 'Mixed',
     addons        TEXT,

@@ -109,6 +109,13 @@ services:
       - SMTP_PASS=${SMTP_PASS:-}
       - SMTP_FROM_EMAIL=${SMTP_FROM_EMAIL:-}
       - SMTP_FROM_NAME=${SMTP_FROM_NAME:-Kumbh Tent Booking}
+      # Private S3 bucket for uploaded Aadhaar/ID-proof documents
+      # (migration 018). Credentials come from the EC2 instance role
+      # (aws-elasticbeanstalk-ec2-role), not env vars — that role has
+      # a scoped inline policy granting only PutObject/GetObject on
+      # this one bucket.
+      - ID_PROOF_DOCS_BUCKET=${ID_PROOF_DOCS_BUCKET:-kumbh-tent-documents-156777722750}
+      - AWS_REGION=${AWS_REGION:-ap-south-1}
     volumes:
       - ./booking-service/firebase-service-account.json:/app/firebase-service-account.json
     restart: unless-stopped

@@ -48,6 +48,10 @@ dependencies:
   # Image
   image_picker: ^1.0.7
   gal: ^2.3.0
+  # Lets the Aadhaar-doc picker take either a photo/gallery image
+  # (image_picker) or, on the same button, an existing PDF scan —
+  # image_picker alone can't reach PDFs.
+  file_picker: ^13.1.0
 
   # Utils
   intl: ^0.20.3

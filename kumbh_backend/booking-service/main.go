@@ -41,6 +41,9 @@ func main() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(2 * time.Minute)
 
+	// ── Aadhaar / ID proof document storage (S3) ──────────
+	initDocumentsStore()
+
 	// ── Refund policy ─────────────────────────────────────
 	refundPolicy = loadRefundPolicy()
 	fmt.Printf("💸 Refund policy: %s\n", refundPolicy.Describe())
@@ -86,6 +89,7 @@ func main() {
 	r.GET("/bookings", myBookings)
 	r.PUT("/bookings/:ref/cancel", cancelBooking)
 	r.DELETE("/bookings/:ref", deleteBooking)
+	r.POST("/bookings/:ref/id-proof-doc", uploadIDProofDoc)
 
 	// ── Refunds ───────────────────────────────────────────
 	r.GET("/bookings/:ref/refund", getBookingRefund)
@@ -103,6 +107,7 @@ func main() {
 	admin.GET("/bookings", adminGetBookings)
 	admin.PUT("/bookings/:ref/status", adminUpdateBookingStatus)
 	admin.PUT("/bookings/:ref/check-in", adminCheckInBooking)
+	admin.GET("/bookings/:ref/id-proof-doc", adminGetIDProofDocURL)
 	admin.GET("/stats", adminGetStats)
 	admin.GET("/revenue/weekly", adminWeeklyRevenue)
 

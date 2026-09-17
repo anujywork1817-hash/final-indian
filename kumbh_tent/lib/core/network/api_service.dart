@@ -187,6 +187,24 @@ class ApiService {
     return res.data;
   }
 
+  /// Uploads the guest's Aadhaar (or other ID proof) photo/PDF for an
+  /// already-created booking. A separate call from [createBooking]
+  /// (that endpoint only binds JSON) — non-fatal by design: callers
+  /// should let the booking/payment flow continue even if this
+  /// fails, since the id_proof text number is still captured either
+  /// way and the guest (or an admin) can retry the upload later.
+  static Future<void> uploadIDProofDoc({
+    required String bookingRef,
+    required String filePath,
+    required String fileName,
+  }) async {
+    await setAuthHeader();
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+    });
+    await _dio.post('/bookings/$bookingRef/id-proof-doc', data: form);
+  }
+
   static Future<List<dynamic>> getMyBookings() async {
     await setAuthHeader();
     final res = await _dio.get('/bookings');
