@@ -80,10 +80,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   int _childrenUnder5 = 0;
   int _childrenAbove5 = 0;
   static const double _childFeePerNight = 500.0;
-  // Under-5 is charged too now (half the 5-12 rate), not free — still
-  // capped at 2 per booking like the 5-12 bracket. Must match
-  // childUnder5FeePerNight in booking-service/pricing.go.
-  static const double _childUnder5FeePerNight = 250.0;
 
   // ── Per-date availability (for calendar color coding) ───────
   //
@@ -264,7 +260,18 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   /// Returns null (falls back to table_calendar's own default look)
   /// once availability hasn't loaded yet, so dates don't flash red
   /// before the fetch lands.
-  Widget? _buildAvailabilityCell(DateTime day) {
+  ///
+  /// [isDisabledCell] is true when table_calendar is rendering this
+  /// day through disabledBuilder — i.e. [_isDaySelectable] rejected
+  /// it. That happens either because the day itself is sold out
+  /// (remaining <= 0, already colored red below) or because it falls
+  /// inside a check-in→check-out range where some OTHER day in
+  /// between is sold out. That second case has plenty of remaining
+  /// units on this day alone, so without this flag it would render
+  /// green — tappable-looking but not actually selectable — which
+  /// read as a broken calendar. Muted/grey makes "blocked" legible
+  /// even when the day's own supply is fine.
+  Widget? _buildAvailabilityCell(DateTime day, {bool isDisabledCell = false}) {
     if (_tentTotalUnits <= 0) return null;
     final remaining = _remainingFor(day);
     final isPast = day.isBefore(
@@ -280,6 +287,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       bg = AppColors.error.withValues(alpha: 0.12);
       textColor = AppColors.error;
       strikeThrough = true;
+    } else if (isDisabledCell) {
+      bg = AppColors.textMuted.withValues(alpha: 0.12);
+      textColor = AppColors.textMuted;
     } else if (remaining <= (_tentTotalUnits * 0.2).ceil()) {
       bg = AppColors.warning.withValues(alpha: 0.20);
       textColor = AppColors.saffronDark;
@@ -358,18 +368,17 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       : 0;
   double get _childrenAbove5Charge =>
       _hasChildren ? _childrenAbove5 * _childFeePerNight * _nights : 0;
-  double get _childrenUnder5Charge =>
-      _hasChildren ? _childrenUnder5 * _childUnder5FeePerNight * _nights : 0;
-  double get _childrenCharge => _childrenAbove5Charge + _childrenUnder5Charge;
+  // Under-5 stays free — only the 5-12 bracket is charged.
+  double get _childrenCharge => _childrenAbove5Charge;
   double get _addonsTotal => _bedTypeSurcharge + _childrenCharge;
 
   // Both children brackets are capped at 2 per booking (matches
-  // common hotel/camp policy for a shared bed) regardless of units;
-  // total children can also never exceed the guest count they're
-  // counted within.
+  // common hotel/camp policy for a shared bed/tent) regardless of
+  // guest count or units — a Single-bed, 1-tent booking can still
+  // bring up to 2 under-5s and 2 5-12s; children never count against
+  // the adult guest total.
   static const int _maxChildrenUnder5 = 2;
   static const int _maxChildrenAbove5 = 2;
-  int get _maxTotalChildren => _guests;
   double get _subtotal => _baseTotal + _addonsTotal;
   double get _discount => _couponApplied ? _subtotal * _couponDiscountRate : 0;
   double get _taxableAmount => _subtotal - _discount;
@@ -542,22 +551,15 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     }
   }
 
-  /// Keeps the children counts valid after guests/tents shrink —
-  /// otherwise a guest count drop could leave more "children"
-  /// recorded than total guests, or more free under-5s than the
-  /// per-tent allowance covers.
+  /// Keeps each children bracket within its own cap of 2 — independent
+  /// of guest count or units, so a Single-bed/1-tent booking can still
+  /// bring the full 2 + 2 children.
   void _clampChildren() {
     if (_childrenUnder5 > _maxChildrenUnder5) {
       _childrenUnder5 = _maxChildrenUnder5;
     }
     if (_childrenAbove5 > _maxChildrenAbove5) {
       _childrenAbove5 = _maxChildrenAbove5;
-    }
-    if (_childrenUnder5 + _childrenAbove5 > _maxTotalChildren) {
-      _childrenAbove5 = (_maxTotalChildren - _childrenUnder5).clamp(
-        0,
-        _maxTotalChildren,
-      );
     }
   }
 
@@ -819,7 +821,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       // back to the library's plain grey "disabled" look
                       // and never showed red.
                       disabledBuilder: (context, day, focusedDay) =>
-                          _buildAvailabilityCell(day),
+                          _buildAvailabilityCell(day, isDisabledCell: true),
                     ),
                     calendarStyle: CalendarStyle(
                       rangeHighlightColor: AppColors.saffron.withValues(
@@ -1071,7 +1073,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                     _divider(),
                     _counter(
                       'Below 5 yrs',
-                      '₹${_childUnder5FeePerNight.toStringAsFixed(0)}/night each · max $_maxChildrenUnder5',
+                      'Free · max $_maxChildrenUnder5 per tent',
                       _childrenUnder5,
                       () {
                         if (_childrenUnder5 > 0) {
@@ -1082,12 +1084,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                         if (_childrenUnder5 >= _maxChildrenUnder5) {
                           _snack(
                             'Max $_maxChildrenUnder5 children (below 5 yrs) per booking',
-                            AppColors.error,
-                          );
-                        } else if (_childrenUnder5 + _childrenAbove5 >=
-                            _maxTotalChildren) {
-                          _snack(
-                            'Children can\'t exceed total guests ($_maxTotalChildren)',
                             AppColors.error,
                           );
                         } else {
@@ -1109,12 +1105,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                         if (_childrenAbove5 >= _maxChildrenAbove5) {
                           _snack(
                             'Max $_maxChildrenAbove5 children (5-12 yrs) per booking',
-                            AppColors.error,
-                          );
-                        } else if (_childrenUnder5 + _childrenAbove5 >=
-                            _maxTotalChildren) {
-                          _snack(
-                            'Children can\'t exceed total guests ($_maxTotalChildren)',
                             AppColors.error,
                           );
                         } else {
@@ -1292,11 +1282,6 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                       _priceRow(
                         'Child fee (5-12 yrs) × $_childrenAbove5 × $_nights nights',
                         '₹${_childrenAbove5Charge.toStringAsFixed(0)}',
-                      ),
-                    if (_hasChildren && _childrenUnder5 > 0)
-                      _priceRow(
-                        'Child fee (below 5 yrs) × $_childrenUnder5 × $_nights nights',
-                        '₹${_childrenUnder5Charge.toStringAsFixed(0)}',
                       ),
                     if (_couponApplied)
                       _priceRow(

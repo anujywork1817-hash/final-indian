@@ -8,7 +8,7 @@ package main
 // (kumbh_tent/lib/features/booking/screens/booking_form_screen.dart):
 //   - Double bed adds 20% of the base tent charge
 //   - each child aged 5-12 costs ₹500 per night
-//   - each child under 5 costs ₹250 per night (half rate — no longer free)
+//   - each child under 5 is free
 //   - a coupon discounts the whole subtotal
 //   - GST is 12% at a per-unit-night tariff of ₹7,500 or less, 18%
 //     above — decided by the NIGHTLY price, never the stay total.
@@ -16,9 +16,10 @@ package main
 const (
 	doubleBedSurchargeRate = 0.20
 	childFeePerNight       = 500.0
-	// Under-5 children are charged at half the 5-12 rate rather than
-	// free — still capped at 2 per booking either way.
-	childUnder5FeePerNight = 250.0
+	// Under-5 stays free — kept as its own bracket (capped at 2,
+	// same as 5-12) purely so it's tracked/reported separately, not
+	// because it's billed.
+	childUnder5FeePerNight = 0.0
 	gstThresholdPerNight   = 7500.0
 	gstRateLow             = 0.12
 	gstRateHigh            = 0.18

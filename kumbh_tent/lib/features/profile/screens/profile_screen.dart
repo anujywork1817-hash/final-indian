@@ -32,7 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   int _reviewCount = 0;
   bool _loading = true;
 
-  static const String _campPhone = '+919523415989';
+  static const String _campPhone = '+919699488429';
   static const String _campWhatsApp = '916207803189';
 
   @override

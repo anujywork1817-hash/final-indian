@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS tents (
     amenities   TEXT[],               -- array of strings
     images      TEXT[],               -- array of image URLs
     capacity    INT DEFAULT 2,
-    total_units INT DEFAULT 5,         -- number of physical tents of this listing
+    total_units INT DEFAULT 10,        -- number of physical tents of this listing
     is_active   BOOLEAN DEFAULT TRUE,
     created_at  TIMESTAMP DEFAULT NOW()
 );

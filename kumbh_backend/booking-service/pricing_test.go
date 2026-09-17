@@ -41,9 +41,9 @@ func TestGSTSlabUsesPerNightTariff(t *testing.T) {
 func TestChargesBreakdown(t *testing.T) {
 	// ₹2000/night x 4 nights x 2 units = ₹16,000 base.
 	// Double bed: +20% => ₹3,200. Two children 5-12: 2 x ₹500 x 4 = ₹4,000.
-	// Two children under 5: 2 x ₹250 x 4 = ₹2,000.
-	// Subtotal ₹25,200. 10% coupon => -₹2,520 => taxable ₹22,680.
-	// GST 12% (₹2000/night) => ₹2,721.60. Total ₹25,401.60.
+	// Two children under 5: free.
+	// Subtotal ₹23,200. 10% coupon => -₹2,320 => taxable ₹20,880.
+	// GST 12% (₹2000/night) => ₹2,505.60. Total ₹23,385.60.
 	got := computeBookingCharges(2000, 4, 2, 2, 2, "Double", 0.10)
 
 	checks := []struct {
@@ -54,12 +54,12 @@ func TestChargesBreakdown(t *testing.T) {
 		{"base", got.Base, 16000},
 		{"bed surcharge", got.BedSurcharge, 3200},
 		{"child fee", got.ChildFee, 4000},
-		{"child under-5 fee", got.ChildUnder5Fee, 2000},
-		{"subtotal", got.Subtotal, 25200},
-		{"discount", got.Discount, 2520},
-		{"taxable", got.Taxable, 22680},
-		{"tax", got.Tax, 2721.6},
-		{"total", got.Total, 25401.6},
+		{"child under-5 fee", got.ChildUnder5Fee, 0},
+		{"subtotal", got.Subtotal, 23200},
+		{"discount", got.Discount, 2320},
+		{"taxable", got.Taxable, 20880},
+		{"tax", got.Tax, 2505.6},
+		{"total", got.Total, 23385.6},
 	}
 	for _, c := range checks {
 		if !approx(c.got, c.want) {

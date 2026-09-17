@@ -128,9 +128,15 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
           totalAmount: ((b['total_amount'] ?? b['total_price'] ?? 0) as num)
               .toDouble(),
           bookingRef: (b['booking_ref'] ?? b['id'])?.toString() ?? '',
+          // total_amount = taxable_amount + tax server-side
+          // (pricing.go), so deriving it this way — rather than
+          // base_amount - discount, which omits the bed/child-fee
+          // surcharges baked into total_amount — always reconciles
+          // with what's actually charged, regardless of add-ons.
           taxableAmount:
-              ((b['base_amount'] ?? 0) as num).toDouble() -
-              ((b['discount'] ?? 0) as num).toDouble(),
+              ((b['total_amount'] ?? b['total_price'] ?? 0) as num)
+                  .toDouble() -
+              ((b['tax'] ?? 0) as num).toDouble(),
           tax: ((b['tax'] ?? 0) as num).toDouble(),
           couponCode: couponCode,
         ),
@@ -609,9 +615,15 @@ class MyBookingsScreenState extends State<MyBookingsScreen>
                       'guests': b['guests'] ?? 1,
                       'total': (b['total_amount'] ?? b['total_price'] ?? 0)
                           .toString(),
+                      // total_amount = taxable_amount + tax (pricing.go)
+                      // — base_amount - discount omits bed/child-fee
+                      // surcharges, understating this whenever either
+                      // add-on applies.
                       'taxable_amount':
-                          ((b['base_amount'] ?? 0) as num).toDouble() -
-                          ((b['discount'] ?? 0) as num).toDouble(),
+                          ((b['total_amount'] ?? b['total_price'] ?? 0)
+                                  as num)
+                              .toDouble() -
+                          ((b['tax'] ?? 0) as num).toDouble(),
                       'tax': ((b['tax'] ?? 0) as num).toDouble(),
                       'status': b['status'] ?? 'pending',
                       'payment_id': b['payment_id'] ?? '',
@@ -1051,18 +1063,24 @@ class _BookingCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: onTicket,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.textPrimary,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                    // A pending booking has no confirmed stay yet — no
+                    // QR/scan-in ticket to show until payment actually
+                    // goes through, so E-Ticket (and its scanner)
+                    // stays hidden until then.
+                    if (_status != 'pending') ...[
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: onTicket,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text('E-Ticket'),
                         ),
-                        child: const Text('E-Ticket'),
                       ),
-                    ),
-                    if (!noShow) ...[
-                      const SizedBox(width: 10),
+                      if (!noShow) const SizedBox(width: 10),
+                    ],
+                    if (!noShow)
                       Expanded(
                         child: OutlinedButton(
                           onPressed: cancelled ? onClear : onCancel,
@@ -1076,7 +1094,6 @@ class _BookingCard extends StatelessWidget {
                           child: Text(cancelled ? 'Clear' : 'Cancel'),
                         ),
                       ),
-                    ],
                   ],
                 ),
                 if (_status == 'pending') ...[

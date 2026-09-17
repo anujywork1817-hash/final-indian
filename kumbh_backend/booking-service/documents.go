@@ -101,8 +101,20 @@ func uploadIDProofDoc(c *gin.Context) {
 		return
 	}
 
+	// Cap the request body BEFORE gin parses the multipart form —
+	// FormFile below triggers ParseMultipartForm, which reads/spools
+	// the whole body first and only exposes header.Size afterwards.
+	// Without this, a client could stream an arbitrarily large body
+	// and exhaust memory/disk well before the "8 MB max" check below
+	// ever runs.
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxIDProofDocBytes+64*1024)
+
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		if err.Error() == "http: request body too large" {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": "file too large — max 8 MB"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no file uploaded"})
 		return
 	}

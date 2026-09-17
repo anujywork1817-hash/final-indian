@@ -101,6 +101,10 @@ func main() {
 
 	r.GET("/api/v1/admin/bookings", proxy(bookingURL+"/admin/bookings"))
 	r.PUT("/api/v1/admin/bookings/:ref/status", func(c *gin.Context) { proxy(bookingURL + "/admin/bookings/" + c.Param("ref") + "/status")(c) })
+	// Presigned URL to view a guest's uploaded Aadhaar/ID-proof doc.
+	r.GET("/api/v1/admin/bookings/:ref/id-proof-doc", func(c *gin.Context) {
+		proxy(bookingURL + "/admin/bookings/" + c.Param("ref") + "/id-proof-doc")(c)
+	})
 	r.GET("/api/v1/admin/stats", proxy(bookingURL+"/admin/stats"))
 	r.GET("/api/v1/admin/revenue/weekly", proxy(bookingURL+"/admin/revenue/weekly"))
 	r.GET("/api/v1/admin/finance/dashboard", proxy(bookingURL+"/admin/finance/dashboard"))
@@ -223,6 +227,12 @@ func main() {
 		// Preview the refund before confirming a cancellation.
 		protected.GET("/bookings/:ref/refund-quote", func(c *gin.Context) {
 			proxy(bookingURL + "/bookings/" + c.Param("ref") + "/refund-quote")(c)
+		})
+		// Aadhaar/ID-proof photo or PDF upload for the caller's own
+		// booking — missing here meant every upload from the app 404'd
+		// at the gateway before ever reaching booking-service.
+		protected.POST("/bookings/:ref/id-proof-doc", func(c *gin.Context) {
+			proxy(bookingURL + "/bookings/" + c.Param("ref") + "/id-proof-doc")(c)
 		})
 		protected.POST("/coupons/validate", proxy(bookingURL+"/coupons/validate"))
 		protected.POST("/orders/create", proxy(paymentURL+"/orders/create"))
