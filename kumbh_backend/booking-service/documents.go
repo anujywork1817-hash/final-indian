@@ -91,8 +91,28 @@ func uploadIDProofDoc(c *gin.Context) {
 	}
 	ref := c.Param("ref")
 
+	// Locks the row for the rest of this request (through the S3 PUT
+	// and the final UPDATE below), not just for this initial check.
+	// Without the lock, two near-simultaneous uploads for the same
+	// booking (two tabs, a retried request) could both pass an
+	// ownership SELECT, both PUT to S3, and race on the final
+	// UPDATE — leaving the loser's object orphaned in S3 with
+	// nothing in the DB ever pointing at it. Holding the row lock
+	// across the S3 round-trip is a deliberate tradeoff (an unusual
+	// endpoint, low traffic, correctness over throughput) rather than
+	// the norm elsewhere in this codebase.
+	tx, err := db.Begin()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to start transaction"})
+		return
+	}
+	defer tx.Rollback()
+
 	var owner string
-	if err := db.QueryRow(`SELECT phone FROM bookings WHERE booking_ref = $1`, ref).Scan(&owner); err != nil {
+	var previousKey sql.NullString
+	if err := tx.QueryRow(`
+		SELECT phone, id_proof_doc_key FROM bookings WHERE booking_ref = $1 FOR UPDATE
+	`, ref).Scan(&owner, &previousKey); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
 		return
 	}
@@ -155,7 +175,7 @@ func uploadIDProofDoc(c *gin.Context) {
 		return
 	}
 
-	if _, err := db.Exec(`
+	if _, err := tx.Exec(`
 		UPDATE bookings
 		SET id_proof_doc_key = $1, id_proof_doc_uploaded_at = NOW()
 		WHERE booking_ref = $2
@@ -163,6 +183,27 @@ func uploadIDProofDoc(c *gin.Context) {
 		log.Printf("id-proof-doc DB update failed for %s: %v", ref, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload saved but could not be linked — please retry"})
 		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		log.Printf("id-proof-doc commit failed for %s: %v", ref, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "upload saved but could not be linked — please retry"})
+		return
+	}
+
+	// A re-upload (guest replacing a blurry/wrong photo) otherwise
+	// leaves the previous object orphaned in S3 forever — delete it
+	// now that the DB row is confirmed pointing at the new one.
+	// Best-effort: a failure here doesn't affect the guest-visible
+	// outcome (their new document is already saved and linked), so
+	// it's logged, not surfaced.
+	if previousKey.Valid && previousKey.String != "" && previousKey.String != key {
+		if _, err := s3Client.DeleteObject(c.Request.Context(), &s3.DeleteObjectInput{
+			Bucket: aws.String(docsBucket),
+			Key:    aws.String(previousKey.String),
+		}); err != nil {
+			log.Printf("id-proof-doc: failed to delete superseded object %s for %s: %v", previousKey.String, ref, err)
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "ID proof document uploaded"})
