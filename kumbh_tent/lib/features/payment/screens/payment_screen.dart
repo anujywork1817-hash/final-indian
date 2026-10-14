@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
-import 'package:razorpay_flutter/razorpay_flutter.dart';
+//import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:razorpay_web/razorpay_web.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:kumbh_tent/core/constants/constants.dart';
 import 'package:kumbh_tent/core/theme/app_colors.dart';
@@ -39,7 +40,7 @@ class PaymentScreen extends StatefulWidget {
     required this.tax,
     this.couponCode,
   });
-
+ 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
 }

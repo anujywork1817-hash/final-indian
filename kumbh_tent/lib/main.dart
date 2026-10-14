@@ -11,6 +11,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:kumbh_tent/core/theme/app_theme.dart';
 import 'package:kumbh_tent/shared/screens/app_root.dart';
 
+import 'core/web_frame.dart';
+
 // ── Background message handler ────────────────────────────
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -138,6 +140,7 @@ class _KumbhTentAppState extends State<KumbhTentApp> {
       theme: AppTheme.lightTheme,
       routerDelegate: _routerDelegate,
       backButtonDispatcher: RootBackButtonDispatcher(),
+      builder: webFrame,
     );
   }
 } 

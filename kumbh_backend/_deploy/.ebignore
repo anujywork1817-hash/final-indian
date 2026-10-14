@@ -1,0 +1,7 @@
+# Elastic Beanstalk deploy bundle exclusions.
+# NOTE: unlike .gitignore, this intentionally does NOT exclude *.json —
+# booking-service and payment-service need firebase-service-account.json
+# bundled and bind-mounted at container start (see docker-compose.yml).
+.git/
+.gitignore
+.env

@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -8,11 +9,10 @@ class ApiService {
   // screens are split between this Dio client and the raw http
   // package, so a mismatch sends half the app to one backend and
   // half to another.
-  static const String baseUrl = kBaseUrl;
-
-  // Production / staging — swap both here and in constants.dart.
-  //static const String baseUrl = 'https://d3dmb495g7jwhi.cloudfront.net/api/v1';
-  //static const String baseUrl = 'https://kumbh-gateway.onrender.com/api/v1';
+  //
+  // `final` (not `const`): kBaseUrl is now chosen at runtime — the
+  // page's own origin on web, the full CloudFront URL on mobile.
+  static final String baseUrl = kBaseUrl;
 
   static final Dio _dio = Dio(
     BaseOptions(
@@ -193,16 +193,28 @@ class ApiService {
   /// should let the booking/payment flow continue even if this
   /// fails, since the id_proof text number is still captured either
   /// way and the guest (or an admin) can retry the upload later.
+  ///
+  /// Takes the file as [bytes] rather than a path: web has no file
+  /// paths, and bytes work the same on Android and iOS.
   static Future<void> uploadIDProofDoc({
     required String bookingRef,
-    required String filePath,
+    required Uint8List bytes,
     required String fileName,
   }) async {
     await setAuthHeader();
     final form = FormData.fromMap({
-      'file': await MultipartFile.fromFile(filePath, filename: fileName),
+      'file': MultipartFile.fromBytes(bytes, filename: fileName),
     });
-    await _dio.post('/bookings/$bookingRef/id-proof-doc', data: form);
+    await _dio.post(
+      '/bookings/$bookingRef/id-proof-doc',
+      data: form,
+      // Photos can be several MB, so give the upload more time than
+      // the 10-second default used for normal JSON calls.
+      options: Options(
+        sendTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
+      ),
+    );
   }
 
   static Future<List<dynamic>> getMyBookings() async {

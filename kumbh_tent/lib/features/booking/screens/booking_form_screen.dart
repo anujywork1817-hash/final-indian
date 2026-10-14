@@ -1,5 +1,5 @@
 import 'dart:async' show unawaited;
-import 'dart:io';
+//import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -50,21 +50,37 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   // itself is created (uploadIDProofDoc needs a real booking_ref).
   // Optional — never blocks booking creation if left empty, or if
   // the upload itself fails afterwards.
-  File? _idProofDoc;
+  //
+  // Held as bytes (not a File/path): on web there is no file path,
+  // and bytes work the same on Android and iOS.
+  Uint8List? _idProofBytes;
   String? _idProofDocName;
 
   Future<void> _pickIdProofDoc() async {
+  try {
     final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
     );
-    final path = result?.path;
-    if (path == null) return;
+    if (result == null) return; // user cancelled
+
+    final bytes = await result.readAsBytes();
+    if (bytes.length > 8 * 1024 * 1024) {
+      if (!mounted) return;
+      _snack('File is too large (max 8 MB)', AppColors.error);
+      return;
+    }
+    if (!mounted) return;
     setState(() {
-      _idProofDoc = File(path);
-      _idProofDocName = result!.name;
+      _idProofBytes = bytes;
+      _idProofDocName = result.name;
     });
+  } catch (e) {
+    debugPrint('ID proof pick failed: $e');
+    if (!mounted) return;
+    _snack('Could not open the file picker', AppColors.error);
   }
+}
 
   // Airport/station pickup, puja kit, and Pilgrim Services
   // (Godavari walk, prasad thali) add-ons were removed from the
@@ -164,7 +180,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   }
 
   Widget _idProofDocPicker() {
-    final hasDoc = _idProofDoc != null;
+    final hasDoc = _idProofBytes != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -221,7 +237,7 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
                 if (hasDoc)
                   GestureDetector(
                     onTap: () => setState(() {
-                      _idProofDoc = null;
+                      _idProofBytes = null;
                       _idProofDocName = null;
                     }),
                     child: const Icon(
@@ -363,9 +379,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   // room. Only shown/added when it actually applies (Double
   // selected); a Single booking's total is unaffected.
   static const double _doubleBedSurchargeRate = 0.20;
-  double get _bedTypeSurcharge => _bedType == 'Double'
-      ? _baseTotal * _doubleBedSurchargeRate
-      : 0;
+  double get _bedTypeSurcharge =>
+      _bedType == 'Double' ? _baseTotal * _doubleBedSurchargeRate : 0;
   double get _childrenAbove5Charge =>
       _hasChildren ? _childrenAbove5 * _childFeePerNight * _nights : 0;
   // Under-5 stays free — only the 5-12 bracket is charged.
@@ -450,11 +465,9 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
           : null;
       _idProofError = _idType == 'Aadhaar'
           ? (idProofDigits.length != 12
-                ? 'Enter a valid 12-digit Aadhaar number'
-                : null)
-          : (idProofText.length < 6
-                ? 'Enter a valid passport number'
-                : null);
+              ? 'Enter a valid 12-digit Aadhaar number'
+              : null)
+          : (idProofText.length < 6 ? 'Enter a valid passport number' : null);
     });
 
     return _nameError == null && _phoneError == null && _idProofError == null;
@@ -501,13 +514,16 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
       // Fire-and-forget: an upload failure here must never block the
       // booking or payment flow that already succeeded. The guest
       // (or an admin, on request) can retry it later.
-      if (_idProofDoc != null) {
+      final proofBytes = _idProofBytes;
+      if (proofBytes != null) {
         unawaited(
           ApiService.uploadIDProofDoc(
             bookingRef: bookingRef,
-            filePath: _idProofDoc!.path,
+            bytes: proofBytes,
             fileName: _idProofDocName ?? 'id_proof',
-          ).catchError((_) {}),
+          ).catchError((Object e) {
+            debugPrint('ID proof upload failed: $e');
+          }),
         );
       }
       if (mounted) {
@@ -1393,39 +1409,39 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
   // ── UI helpers ────────────────────────────────────────────
 
   Widget _smallLabel(String t) => Padding(
-    padding: const EdgeInsets.only(bottom: 2),
-    child: Text(
-      t,
-      style: GoogleFonts.poppins(
-        fontSize: 11,
-        fontWeight: FontWeight.w700,
-        color: AppColors.textMuted,
-        letterSpacing: 1.4,
-      ),
-    ),
-  );
+        padding: const EdgeInsets.only(bottom: 2),
+        child: Text(
+          t,
+          style: GoogleFonts.poppins(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textMuted,
+            letterSpacing: 1.4,
+          ),
+        ),
+      );
 
   Widget _card({required Widget child}) => Container(
-    padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(18),
-      border: Border.all(color: AppColors.cardBorder),
-      boxShadow: [
-        BoxShadow(
-          color: Colors.black.withValues(alpha: 0.06),
-          blurRadius: 16,
-          offset: const Offset(0, 4),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.cardBorder),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-      ],
-    ),
-    child: child,
-  );
+        child: child,
+      );
 
   Widget _divider() => const Padding(
-    padding: EdgeInsets.symmetric(vertical: 12),
-    child: Divider(color: AppColors.border, thickness: 1, height: 1),
-  );
+        padding: EdgeInsets.symmetric(vertical: 12),
+        child: Divider(color: AppColors.border, thickness: 1, height: 1),
+      );
 
   Widget _datePill(String label, DateTime? date) {
     final months = [
@@ -1475,9 +1491,8 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
             style: GoogleFonts.poppins(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: date != null
-                  ? AppColors.textPrimary
-                  : AppColors.textMuted,
+              color:
+                  date != null ? AppColors.textPrimary : AppColors.textMuted,
             ),
           ),
           if (date != null)
@@ -1588,48 +1603,49 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     int value,
     VoidCallback minus,
     VoidCallback plus,
-  ) => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-    children: [
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          Text(
-            sub,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              color: AppColors.textMuted,
-            ),
-          ),
-        ],
-      ),
+  ) =>
       Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _iconBtn(Icons.remove_rounded, minus, filled: false),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Text(
-              '$value',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
+              Text(
+                sub,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
           ),
-          _iconBtn(Icons.add_rounded, plus, filled: true),
+          Row(
+            children: [
+              _iconBtn(Icons.remove_rounded, minus, filled: false),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(
+                  '$value',
+                  style: GoogleFonts.poppins(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              _iconBtn(Icons.add_rounded, plus, filled: true),
+            ],
+          ),
         ],
-      ),
-    ],
-  );
+      );
 
   Widget _iconBtn(IconData icon, VoidCallback cb, {required bool filled}) =>
       GestureDetector(
@@ -1659,36 +1675,38 @@ class _BookingFormScreenState extends State<BookingFormScreen> {
     String value, {
     bool isDiscount = false,
     bool isTotal = false,
-  }) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 5),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: isTotal ? 14 : 13,
-              fontWeight: isTotal ? FontWeight.w700 : FontWeight.normal,
-              color: isTotal ? AppColors.textPrimary : AppColors.textMuted,
+  }) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.poppins(
+                  fontSize: isTotal ? 14 : 13,
+                  fontWeight: isTotal ? FontWeight.w700 : FontWeight.normal,
+                  color:
+                      isTotal ? AppColors.textPrimary : AppColors.textMuted,
+                ),
+              ),
             ),
-          ),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                fontSize: isTotal ? 18 : 13,
+                fontWeight: isTotal ? FontWeight.w700 : FontWeight.w600,
+                color: isDiscount
+                    ? AppColors.success
+                    : isTotal
+                        ? AppColors.saffronDark
+                        : AppColors.textPrimary,
+              ),
+            ),
+          ],
         ),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            fontSize: isTotal ? 18 : 13,
-            fontWeight: isTotal ? FontWeight.w700 : FontWeight.w600,
-            color: isDiscount
-                ? AppColors.success
-                : isTotal
-                ? AppColors.saffronDark
-                : AppColors.textPrimary,
-          ),
-        ),
-      ],
-    ),
-  );
+      );
 }
 
 /// Formats an Aadhaar number as it's typed into 4 groups of 4
@@ -1701,9 +1719,8 @@ class _AadhaarNumberFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final allDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final digits = allDigits.length > 12
-        ? allDigits.substring(0, 12)
-        : allDigits;
+    final digits =
+        allDigits.length > 12 ? allDigits.substring(0, 12) : allDigits;
 
     final buffer = StringBuffer();
     for (var i = 0; i < digits.length; i++) {

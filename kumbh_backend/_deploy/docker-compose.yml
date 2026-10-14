@@ -1,0 +1,125 @@
+services:
+
+  # ── PostgreSQL (local dev only — AWS uses RDS via DATABASE_URL) ──
+  postgres:
+    image: postgres:15-alpine
+    container_name: kumbh_postgres
+    profiles: ["local"]
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kumbh_tent
+    ports:
+      - "0.0.0.0:${POSTGRES_HOST_PORT:-5435}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── API Gateway ────────────────────────────
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: kumbh_gateway
+    ports:
+      - "0.0.0.0:${GATEWAY_PORT:-8085}:8080"
+    environment:
+      - API_GATEWAY_PORT=8080
+      - AUTH_SERVICE_URL=http://auth-service:8081
+      - TENT_SERVICE_URL=http://tent-service:8082
+      - BOOKING_SERVICE_URL=http://booking-service:8083
+      - PAYMENT_SERVICE_URL=http://payment-service:8084
+      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+    depends_on:
+      - auth-service
+      - tent-service
+      - booking-service
+      - payment-service
+    restart: unless-stopped
+
+  # ── Auth Service ───────────────────────────
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: kumbh_auth
+    ports:
+      - "0.0.0.0:8081:8081"
+    environment:
+      - AUTH_SERVICE_PORT=8081
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
+      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # ── Tent Service ───────────────────────────
+  tent-service:
+    build:
+      context: .
+      dockerfile: tent-service/Dockerfile
+    container_name: kumbh_tents
+    ports:
+      - "0.0.0.0:8082:8082"
+    environment:
+      - TENT_SERVICE_PORT=8082
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # ── Booking Service ────────────────────────
+  booking-service:
+    build:
+      context: .
+      dockerfile: booking-service/Dockerfile
+    container_name: kumbh_bookings
+    ports:
+      - "0.0.0.0:8083:8083"
+    environment:
+      - BOOKING_SERVICE_PORT=8083
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
+      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
+    volumes:
+      - ./booking-service/firebase-service-account.json:/app/firebase-service-account.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # ── Payment Service ────────────────────────
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    container_name: kumbh_payments
+    ports:
+      - "0.0.0.0:8084:8084"
+    environment:
+      - PAYMENT_SERVICE_PORT=8084
+      - DATABASE_URL=${DATABASE_URL:-postgres://postgres:password@postgres:5432/kumbh_tent?sslmode=disable}
+      - RAZORPAY_KEY_ID=${RAZORPAY_KEY_ID:-rzp_test_SqpASBdCN2DXd0}
+      - RAZORPAY_KEY_SECRET=${RAZORPAY_KEY_SECRET:-0CA01F0L5t325WgA1FcQQKth}
+      - JWT_SECRET=${JWT_SECRET:-kumbh2027supersecretkey}
+      - FIREBASE_SERVICE_ACCOUNT=/app/firebase-service-account.json
+    volumes:
+      - ./payment-service/firebase-service-account.json:/app/firebase-service-account.json
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
